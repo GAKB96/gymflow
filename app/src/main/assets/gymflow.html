@@ -45,6 +45,9 @@ body.light .hbtn.alt{background:rgba(0,0,0,.12)}
 .seg button.on{background:var(--accent);color:var(--ink)}
 .dayrow{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;background:var(--card2);margin-top:8px;width:100%;text-align:left}
 .dayrow b{display:block}
+.dnum{flex:0 0 44px;text-align:center;font-size:10px;text-transform:uppercase;color:var(--muted);font-weight:700;letter-spacing:.06em}.dnum b{display:block;font-size:22px;color:var(--accent);letter-spacing:0;line-height:1.1}
+.dayrow span.small{display:block}.exlist{display:block;font-size:12px;color:var(--muted);margin-top:4px;line-height:1.45}
+.pick{display:block;width:100%;text-align:left}.pick.on{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
 .badge{font-size:11px;font-weight:800;padding:3px 8px;border-radius:99px;background:var(--accent);color:var(--ink)}
 .badge.soft{background:transparent;border:1px solid var(--line);color:var(--muted)}
 /* ring */
@@ -269,6 +272,7 @@ try{SOUNDLIB=JSON.parse(localStorage.getItem(SKEY)||'[]')}catch(e){}
 let saveT;function save(now){clearTimeout(saveT);const f=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};if(now)f();else saveT=setTimeout(f,250)}
 function saveSounds(){try{localStorage.setItem(SKEY,JSON.stringify(SOUNDLIB));return true}catch(e){toast('Clip too large to store');return false}}
 const UI={view:S.active?'workout':'home',hist:null,month:{y:new Date().getFullYear(),m:new Date().getMonth()},dayEdit:null};
+if(!S.settings.onboarded){if(S.history.length||S.active)S.settings.onboarded=true;else UI.view='welcome'}
 
 /* ---------- program logic ---------- */
 const exInfo=id=>EX[id]||(S.customEx.find(c=>c.id===id))||{n:'Exercise',m:'Other'};
@@ -357,7 +361,7 @@ function nativeRestSync(){if(!NATIVE)return;const e=+nat('restEnd')||0;
 function nativeRestDone(){if(T.on){T.fired=true;hideRest()}if(S.active)showAlert()}
 function nativeAlert(){nativeRestDone()}
 function handleBack(){if($('#modal').classList.contains('on')){closeModal(false);return true}if($('#alert').classList.contains('on')){hideAlert();return true}
- const back={workout:'home',hist:'history',dayedit:'home',history:'home',stats:'home',settings:'home'}[UI.view];if(back){UI.view=back;render();window.scrollTo(0,0);return true}return false}
+ const back={workout:'home',hist:'history',dayedit:'settings',history:'home',stats:'home',settings:'home'}[UI.view];if(back){UI.view=back;render();window.scrollTo(0,0);return true}return false}
 
 /* ---------- rest timer ---------- */
 const T={on:false,end:0,total:0,nodes:[],fired:false,iv:null};
@@ -386,9 +390,9 @@ function renderPick(q){const ql=q.trim().toLowerCase(),all=allExercises();let h=
  $('#plist').innerHTML=h||'<div class="empty">No match. Type a name to quick-add it.</div>'}
 
 /* ---------- render ---------- */
-function render(){document.body.classList.toggle('inwork',UI.view==='workout');
- document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===UI.view||(UI.view==='hist'&&b.dataset.v==='history')||(UI.view==='dayedit'&&b.dataset.v==='home')));
- const f={home:renderHome,workout:renderWorkout,history:renderHistory,hist:renderHist,stats:renderStats,settings:renderSettings,dayedit:renderDayEdit}[UI.view]||renderHome;
+function render(){document.body.classList.toggle('inwork',UI.view==='workout'||UI.view==='welcome');
+ document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===UI.view||(UI.view==='hist'&&b.dataset.v==='history')||(UI.view==='dayedit'&&b.dataset.v==='settings')));
+ const f={home:renderHome,workout:renderWorkout,history:renderHistory,hist:renderHist,stats:renderStats,settings:renderSettings,dayedit:renderDayEdit,welcome:renderWelcome}[UI.view]||renderHome;
  $('#app').innerHTML=f();updAwake();poke()}
 
 function ring(pct,size,stroke,center,sub){const r=(size-stroke)/2,C=2*Math.PI*r,p=Math.max(0,Math.min(1,pct));
@@ -403,7 +407,7 @@ function renderHome(){const s=S.settings,now=new Date(),lvl=s.level;
  else{const d=todayDay();
   if(!d)hero=`<div class="hero"><div class="hdate">${dateStr}</div><div class="hlabel">Custom (Pro)</div><div class="htitle">Blank slate</div><div class="hsub">Build your own days with quick-add exercises.</div><div class="hbtns"><button class="hbtn" data-act="newday">+ Create a day</button><button class="hbtn alt" data-act="quickstart">Empty workout</button></div></div>`;
   else{const plan=dayPlan(d),sets=plan.reduce((a,p)=>a+p.sets,0),est=Math.round(sets*(s.rest+45)/60),ms=[...new Set(plan.map(p=>exInfo(p.id).m))];
-   hero=`<div class="hero"><div class="hdate">${dateStr}</div><div class="hlabel">${S.pick?'Selected':(S.due&&S.due>day0()?'Rest day · next up '+fmtDate(S.due):"Today's workout")} · ${lvl==='custom'?'Custom':PROGRAMS[lvl].name+' · '+s.intensity[0].toUpperCase()+s.intensity.slice(1)}</div>
+   const di=rotation().findIndex(x=>x.id===d.id);hero=`<div class="hero"><div class="hdate">${dateStr}</div><div class="hlabel">${di>=0?'Day '+(di+1)+' · ':''}${S.pick?'Selected':(S.due&&S.due>day0()?'Rest day · next up '+fmtDate(S.due):"Today's workout")}</div>
    <div class="htitle">${esc(d.name)}</div><div class="hsub">${esc(d.sub)} · ${plan.length} exercises · ${sets} sets · ~${est} min</div>
    <div class="chips">${ms.map(m=>`<span>${m}</span>`).join('')}</div>
    <div class="hbtns"><button class="hbtn" data-act="start">Start workout</button><button class="hbtn alt" data-act="change">Change</button></div></div>`}}
@@ -414,15 +418,12 @@ function renderHome(){const s=S.settings,now=new Date(),lvl=s.level;
  const dots=['M','T','W','T','F','S','S'].map((l,i)=>{const d0=new Date(ws);d0.setDate(d0.getDate()+i);const d1=new Date(d0);d1.setDate(d1.getDate()+1);const y=wk.some(h=>h.start>=d0&&h.start<d1);const pl=S.settings.tdays.includes(i);return `<button data-act="tday" data-i="${i}" class="${y?'y':''} ${pl?'p':''} ${i===ti?'t':''}"><i></i>${l}</button>`}).join('');
  const weekCard=`<div class="card"><div class="row">${ring(wk.length/g,92,10,wk.length+'/'+g,'this week')}<div class="sp"><b>Weekly goal</b><div class="small muted" style="margin:3px 0 10px">${wk.length>=g?'Goal hit — great week 🔥':(g-wk.length)+' more to hit your goal'}</div>
   <div class="stepper"><button data-act="goal" data-d="-1">−</button><b>${g} days</b><button data-act="goal" data-d="1">+</button></div></div></div><div class="weekdots">${dots}</div><div class="small muted" style="margin-top:8px">Tap the days to set your gym days.</div></div>`;
- // program
- const rot=rotation(),nd=nextDay();let prog=`<div class="card"><b>Program</b><div class="seg" style="margin:10px 0">${LEVELS.map(([k,n])=>`<button class="${lvl===k?'on':''}" data-act="level" data-k="${k}">${n}</button>`).join('')}</div>`;
- if(lvl!=='custom'){const P=PROGRAMS[lvl];prog+=`<div class="small muted">${P.desc}</div><div class="seg" style="margin:12px 0 4px">${INTS.map(([k,n])=>`<button class="${s.intensity===k?'on':''}" data-act="intensity" data-k="${k}">${n} · ${P.counts[k]} ex</button>`).join('')}</div>
-  <div class="small muted" style="margin:8px 2px 0">Rotation: ${rot.length} days, set by your ${g}-day weekly goal. Tap a day to do it today.</div>
-  ${rot.map(d=>{const pl=dayPlan(d);return `<button class="dayrow" data-act="pickday" data-id="${d.id}"><div class="sp"><b>${esc(d.name)}</b><span class="small muted">${esc(d.sub)} · ${pl.length} ex · ${pl[0].sets} sets each</span></div>${S.active?'':(todayDay()&&todayDay().id===d.id?'<span class="badge">Today</span>':(nd&&nd.id===d.id?'<span class="badge soft">Next</span>':''))}</button>`}).join('')}`}
- else{prog+=`<div class="small muted">Your own days. Add any exercise, or quick-add new ones by typing.</div>
-  ${S.customDays.map(d=>`<div class="dayrow"><button class="sp" style="text-align:left" data-act="pickday" data-id="${d.id}"><b>${esc(d.name)}</b><span class="small muted">${d.ex.length} exercises · ${d.sets||3} sets</span></button>${todayDay()&&todayDay().id===d.id&&!S.active?'<span class="badge">Today</span>':''}<button class="icon" data-act="editday" data-id="${d.id}">✎</button></div>`).join('')}
-  <div class="exfoot"><button class="ghost" data-act="newday">+ New day</button><button class="ghost" data-act="quickstart">Empty workout</button></div>`}
- prog+='</div>';
+ // plan, day by day
+ const rot=rotation(),td=S.active?null:todayDay(),wkIds=new Set(wk.map(h=>h.dayId));
+ let prog=`<div class="card"><div class="row"><b class="sp">Your plan</b><span class="small muted">${lvl==='custom'?'Custom':PROGRAMS[lvl].name+' · '+s.intensity[0].toUpperCase()+s.intensity.slice(1)}</span></div>`;
+ if(!rot.length)prog+=`<div class="small muted" style="margin:8px 0">No days yet.</div><div class="exfoot"><button class="ghost" data-act="newday">+ Create a day</button></div>`;
+ else prog+=rot.map((d,i)=>{const pl=dayPlan(d),done=wkIds.has(d.id);return `<button class="dayrow" data-act="pickday" data-id="${d.id}"><div class="dnum">Day<b>${i+1}</b></div><div class="sp"><b>${esc(d.name)}</b><span class="small muted">${esc(d.sub)} · ${pl.length} exercises · ${pl.reduce((x,q)=>x+q.sets,0)} sets</span><span class="exlist">${pl.map(q=>esc(exName(q.id))).join(' · ')||'No exercises yet'}</span></div>${td&&td.id===d.id?'<span class="badge">Today</span>':(done?'<span class="badge soft">Done ✓</span>':'')}</button>`}).join('');
+ prog+=`<div class="small muted" style="margin-top:10px">Tap a day to do it today. Change your plan in Settings.</div></div>`;
  const missCard=mi?`<div class="card miss"><b>Missed ${mi.n>1?mi.n+' workouts':'workout'}: ${mi.names.map(esc).join(', ')}</b><div class="small muted" style="margin-top:4px">${mi.n>1?'First one was':'It was'} due ${fmtDate(mi.first)}. Continue picks up where you left off and shifts the rest of the plan. Skip moves on to ${esc(mi.skipTo)}.</div>
  <div class="exfoot"><button class="btn sp" data-act="mcont">Continue from ${esc(mi.cont)}</button><button class="btn2" data-act="mskip">Skip</button></div></div>`:'';
  return `<div class="grid homegrid"><div>${missCard}${hero}<div class="last">${lastLine}</div>${weekCard}</div><div>${prog}</div></div>`}
@@ -481,9 +482,20 @@ function renderStats(){const {y,m}=UI.month,st=calcStats(y,m),u=S.settings.unit;
  <div class="card"><b>Heaviest lifts this month</b><div style="margin-top:8px">${best||'<div class="small muted">Log some weights to see them here.</div>'}</div></div></div>
  <div class="exfoot"><button class="btn sp" data-act="exportimg">Export image</button><button class="btn2 sp" data-act="exportcsv">Export data</button></div>`}
 
+function planSettings(){const s=S.settings,lvl=s.level,rot=rotation();
+ let h=`<h2>Training plan</h2><div class="card"><div class="seg">${LEVELS.map(([k,n])=>`<button class="${lvl===k?'on':''}" data-act="level" data-k="${k}">${n}</button>`).join('')}</div>`;
+ if(lvl!=='custom'){const P=PROGRAMS[lvl];h+=`<div class="small muted" style="margin-top:10px">${P.desc}</div><div class="small" style="margin:14px 0 6px;font-weight:700">Intensity</div><div class="seg">${INTS.map(([k,n])=>`<button class="${s.intensity===k?'on':''}" data-act="intensity" data-k="${k}">${n} · ${P.counts[k]} ex</button>`).join('')}</div><div class="small muted" style="margin-top:10px">Your ${s.goal}-day weekly goal gives a ${rot.length}-day rotation.</div>`}
+ else h+=`<div class="small muted" style="margin-top:10px">Your own days. Add any exercise, or quick-add new ones by typing.</div>${S.customDays.map((d,i)=>`<div class="dayrow"><div class="dnum">Day<b>${i+1}</b></div><div class="sp"><b>${esc(d.name)}</b><span class="small muted">${d.ex.length} exercises · ${d.sets||3} sets</span></div><button class="icon" data-act="editday" data-id="${d.id}">✎</button></div>`).join('')}<div class="exfoot"><button class="ghost" data-act="newday">+ New day</button></div>`;
+ return h+'</div>'}
+function renderWelcome(){const s=S.settings,lvl=s.level;
+ return `<div style="max-width:620px;margin:0 auto"><h1 style="font-size:32px;margin-top:22px">Welcome to GymFlow 💪</h1><p class="muted" style="margin-top:-6px">Pick a plan to start. You can change it any time in Settings.</p>
+ <h2>Your plan</h2>${LEVELS.map(([k,n])=>{const P=PROGRAMS[k],d=k==='custom'?'A blank page: build your own days with quick-add exercises. For experienced lifters.':P.desc;return `<button class="card pick ${lvl===k?'on':''}" data-act="level" data-k="${k}"><div class="row"><b class="sp">${n}</b>${k==='custom'?'':`<span class="badge soft">${P.days.length} workouts</span>`}</div><div class="small muted" style="margin-top:6px">${d}</div></button>`}).join('')}
+ ${lvl!=='custom'?`<h2>Intensity</h2><div class="seg">${INTS.map(([k,n])=>`<button class="${s.intensity===k?'on':''}" data-act="intensity" data-k="${k}">${n} · ${PROGRAMS[lvl].counts[k]} exercises</button>`).join('')}</div>`:''}
+ <h2>Days per week</h2><div class="card"><div class="row"><div class="sp small muted">How many days you plan to train. You can pick the exact days later on Home.</div><div class="stepper"><button data-act="goal" data-d="-1">−</button><b>${s.goal} days</b><button data-act="goal" data-d="1">+</button></div></div></div>
+ <button class="btn" style="width:100%;padding:16px;font-size:17px;margin:8px 0 30px" data-act="wdone">Start training</button></div>`}
 function renderSettings(){const s=S.settings;const seg=(act,cur,opts)=>`<div class="seg">${opts.map(([k,n])=>`<button class="${cur===k?'on':''}" data-act="${act}" data-k="${k}">${n}</button>`).join('')}</div>`;
  const snd=[...Object.entries(SOUNDS).map(([k,v])=>[k,v.n,0]),...SOUNDLIB.map(c=>[c.id,c.name,1])];
- return `<h1>Settings</h1><h2>Appearance</h2><div class="card">
+ return `<h1>Settings</h1>${planSettings()}<h2>Appearance</h2><div class="card">
  <div class="srow"><div class="l">Theme</div>${seg('theme',s.theme,[['dark','Dark'],['light','Light']])}</div>
  <div class="srow" style="flex-wrap:wrap"><div class="l">Accent colour</div><div class="sw">${ACCENTS.map(c=>`<button class="${s.accent===c?'on':''}" style="background:${c}" data-act="accent" data-k="${c}" aria-label="${c}"></button>`).join('')}<input type="color" id="accpick" value="${s.accent}" style="width:32px;height:32px;border:0;background:none;padding:0"></div></div></div>
  <h2>Workout</h2><div class="card">
@@ -503,7 +515,7 @@ function renderSettings(){const s=S.settings;const seg=(act,cur,opts)=>`<div cla
  <div class="exfoot"><button class="ghost" style="color:var(--danger)" data-act="reset">Erase all data</button></div></div>`}
 
 function renderDayEdit(){const d=S.customDays.find(x=>x.id===UI.dayEdit);if(!d){UI.view='home';return renderHome()}
- return `<div class="wtop"><button class="icon" data-act="nav" data-v="home">‹</button><div class="sp t">Edit day</div><button class="btn" data-act="nav" data-v="home">Done</button></div>
+ return `<div class="wtop"><button class="icon" data-act="nav" data-v="settings">‹</button><div class="sp t">Edit day</div><button class="btn" data-act="nav" data-v="settings">Done</button></div>
  <div class="card"><div class="small muted" style="margin-bottom:6px">Day name</div><input class="field" id="dayname" value="${esc(d.name)}" placeholder="e.g. Chest & Arms">
  <div class="srow" style="margin-top:8px"><div class="l">Sets per exercise</div><div class="stepper"><button data-act="daysets" data-d="-1">−</button><b>${d.sets||3}</b><button data-act="daysets" data-d="1">+</button></div></div></div>
  <div class="card">${d.ex.length?d.ex.map((id,i)=>`<div class="row" style="padding:6px 0"><span class="sp"><b>${esc(exName(id))}</b> <span class="small muted">${exInfo(id).m}</span></span><button class="icon" data-act="daymv" data-i="${i}" data-d="-1">↑</button><button class="icon" data-act="daymv" data-i="${i}" data-d="1">↓</button><button class="icon" data-act="dayrm" data-i="${i}">✕</button></div>`).join(''):'<div class="small muted">No exercises yet.</div>'}
@@ -558,6 +570,7 @@ const ACT={
  intensity:b=>{S.settings.intensity=b.dataset.k;save();render()},
  goal:b=>{const g=Math.max(1,Math.min(7,S.settings.goal+ +b.dataset.d));S.settings.goal=g;S.settings.tdays=DEF_DAYS[g].slice();S.due=nextTrain(day0());save();render()},
  tday:b=>{const i=+b.dataset.i,t=S.settings.tdays;const k=t.indexOf(i);if(k>=0){if(t.length>1)t.splice(k,1)}else{t.push(i);t.sort()}S.settings.goal=t.length;S.due=nextTrain(day0());save();render()},
+ wdone:()=>{S.settings.onboarded=true;S.due=nextTrain(day0());save(true);UI.view='home';render();window.scrollTo(0,0)},
  mcont:()=>{S.due=day0();save();render()},
  mskip:()=>{const mi=missedInfo();if(mi){const l=S.settings.level;S.rot[l]=(S.rot[l]||0)+mi.n}S.due=nextTrain(day0());save();render()},
  finish:()=>finishWorkout(),
@@ -613,7 +626,7 @@ const ACT={
  dayaddex:()=>pickExercise(id=>{S.customDays.find(x=>x.id===UI.dayEdit).ex.push(id);save();render()}),
  daymv:b=>{const d=S.customDays.find(x=>x.id===UI.dayEdit),i=+b.dataset.i,j=i+ +b.dataset.d;if(j>=0&&j<d.ex.length)[d.ex[i],d.ex[j]]=[d.ex[j],d.ex[i]];save();render()},
  dayrm:b=>{S.customDays.find(x=>x.id===UI.dayEdit).ex.splice(+b.dataset.i,1);save();render()},
- delday:async()=>{if(await confirmBox('Delete this day?','Past workouts stay in history.','Delete',true)){S.customDays=S.customDays.filter(x=>x.id!==UI.dayEdit);if(S.pick===UI.dayEdit)S.pick=null;save();UI.view='home';render()}}
+ delday:async()=>{if(await confirmBox('Delete this day?','Past workouts stay in history.','Delete',true)){S.customDays=S.customDays.filter(x=>x.id!==UI.dayEdit);if(S.pick===UI.dayEdit)S.pick=null;save();UI.view='settings';render()}}
 };
 document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(!b||b.disabled)return;const f=ACT[b.dataset.act];if(f)f(b,e)});
 document.addEventListener('input',e=>{const t=e.target;
