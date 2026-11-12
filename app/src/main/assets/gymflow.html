@@ -196,6 +196,25 @@ body.light nav{background:rgba(255,255,255,.6);border-top-color:rgba(20,23,28,.0
 .wtop{background:rgba(11,13,18,.5);backdrop-filter:blur(30px) saturate(160%);-webkit-backdrop-filter:blur(30px) saturate(160%);margin:0 -16px;padding:8px 16px 10px}
 body.light .wtop{background:rgba(238,240,245,.7)}
 .sheet{background:color-mix(in srgb,var(--card) 94%,transparent);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px)}
+.bestlift{border-color:color-mix(in srgb,var(--accent) 55%,transparent);background:linear-gradient(150deg,color-mix(in srgb,var(--accent) 22%,transparent),var(--glass))}
+.blabel{font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--accent)}
+.bname{font-size:20px;font-weight:800;margin-top:8px}.bset{font-size:28px;font-weight:900;letter-spacing:-.02em;margin:2px 0 4px}
+.num{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+.fx{transition:filter .3s ease,opacity .3s ease}
+.fxdim{filter:blur(3px)!important;opacity:.14!important}
+.card.focus{transform:scale(1.05);box-shadow:0 20px 60px rgba(0,0,0,.6);z-index:6;position:relative}
+.card{transition:transform .3s ease,box-shadow .3s ease}
+.setrow{position:relative}
+.setrow.frow>.num{opacity:0;transition:opacity .2s}
+.setrow.frow>.unit{opacity:0}
+.wpick{position:absolute;top:50%;height:230px;margin-top:-115px;display:grid;grid-template-columns:1fr 50px 1fr;gap:8px;align-items:center;pointer-events:none;z-index:3;
+ -webkit-mask:linear-gradient(transparent,#000 22%,#000 78%,transparent);mask:linear-gradient(transparent,#000 22%,#000 78%,transparent);opacity:0;transition:opacity .25s}
+.wpick.on{opacity:1}
+.wpick .pband{position:absolute;left:0;right:0;top:50%;height:40px;margin-top:-20px;border-radius:12px;background:rgba(255,255,255,.13)}
+body.light .wpick .pband{background:rgba(20,23,28,.08)}
+.wpick .wh{position:relative;height:100%;transform-style:preserve-3d;perspective:600px}
+.wpick .n{position:absolute;left:0;right:0;top:50%;height:38px;margin-top:-19px;display:grid;place-items:center;backface-visibility:hidden}
+.wpick .pu{position:relative;z-index:1;text-align:center;font-size:13px;font-weight:700}
 </style>
 </head>
 <body>
@@ -425,6 +444,57 @@ function tickRest(){if(!T.on)return;const left=(T.end-Date.now())/1000;
 function hideRest(){T.on=false;T.fired=false;clearInterval(T.iv);T.iv=null;$('#rest').classList.remove('on','fin')}
 function skipRest(){stopNodes();hideRest();nat('cancelRest')}
 
+/* ---------- number wheels ---------- */
+const WROW=38;
+function wheelSpec(e,f){const u=S.settings.unit;if(f==='w')return u==='kg'?{step:.5,max:400}:{step:1,max:900};return e.id==='plank'?{step:5,max:600}:{step:1,max:100}}
+function wheelVal(e,st,f){const v=parseFloat(st[f]);if(v>0||st[f]==='0')return v;if(f==='r'){const p=parseFloat(st.p)||parseInt(e.target)||0;return p}return 0}
+function drawDrum(el,spec,pos,isW,bw){el.innerHTML='';const step=19,R=WROW/2/Math.tan(step/2*Math.PI/180),lo=Math.max(0,Math.floor(pos)-5),hi=Math.min(Math.round(spec.max/spec.step),Math.ceil(pos)+5);
+ for(let i=lo;i<=hi;i++){const k=i-pos,a=-k*step;if(Math.abs(a)>85)continue;const d=Math.abs(k),c=d<.5,n=document.createElement('div');n.className='n';
+  const v=fmtW(i*spec.step);n.textContent=isW&&bw&&v===0?'BW':v;n.style.transform=`translateZ(${-R}px) rotateX(${a}deg) translateZ(${R}px)`;
+  n.style.opacity=c?1:Math.max(.2,.62-d*.12);n.style.filter=`blur(${Math.min(1.1,d*.3)}px)`;n.style.fontSize=(c?20:18-d*.5)+'px';n.style.fontWeight=c?800:500;n.style.color=c?'var(--text)':'var(--muted)';el.appendChild(n)}}
+let WH=null;
+function wheelOpen(inp,y){const row=inp.closest('.setrow'),card=inp.closest('.card'),w=getW(inp.dataset.w);if(!row||!card||!w||!editable(w))return false;
+ const e=w.ex[+inp.dataset.e],st=e.sets[+inp.dataset.s],f=inp.dataset.f,bw=BW.has(e.id);
+ const ws=wheelSpec(e,'w'),rs=wheelSpec(e,'r');
+ const wv=Math.round(wheelVal(e,st,'w')/ws.step),rv=Math.round(wheelVal(e,st,'r')/rs.step);
+ const ins=row.querySelectorAll('.num');const r0=row.getBoundingClientRect(),a=ins[0].getBoundingClientRect(),b=ins[1].getBoundingClientRect();
+ const pk=document.createElement('div');pk.className='wpick';pk.style.left=(a.left-r0.left)+'px';pk.style.width=(b.right-a.left)+'px';
+ pk.style.gridTemplateColumns=`${a.width}px 1fr ${b.width}px`;
+ pk.innerHTML=`<div class="pband"></div><div class="wh"></div><div class="pu">${S.settings.unit}</div><div class="wh"></div>`;row.appendChild(pk);
+ const drums=pk.querySelectorAll('.wh');
+ WH={inp,row,card,pk,e,st,f,bw,spec:f==='w'?ws:rs,other:f==='w'?{el:drums[1],spec:rs,pos:rv}:{el:drums[0],spec:ws,pos:wv},el:drums[f==='w'?0:1],pos:f==='w'?wv:rv,start:f==='w'?wv:rv,y0:y,last:[],idx:null,raf:0};
+ drawDrum(WH.other.el,WH.other.spec,WH.other.pos,f!=='w',bw);drawDrum(WH.el,WH.spec,WH.pos,f==='w',bw);
+ // focus: zoom the card, blur everything except the exercise name and this set
+ card.style.transformOrigin=`50% ${r0.top-card.getBoundingClientRect().top+r0.height/2}px`;
+ const dim=[...document.querySelectorAll('.wtop,#app .card,#app .col>.exfoot,#app .col>.small,#app>.row,.cols>.col>div:not(.card)')].filter(x=>x!==card&&!x.contains(card));
+ [...card.children].forEach(ch=>{if(ch===row)return;if(ch.classList.contains('exhead')){[...ch.querySelectorAll('.exsub,.icon')].forEach(z=>dim.push(z))}else dim.push(ch)});
+ WH.dim=dim;dim.forEach(x=>{x.classList.add('fx');x.classList.add('fxdim')});
+ inp.readOnly=true;inp.blur();row.classList.add('frow');card.classList.add('focus');requestAnimationFrame(()=>pk.classList.add('on'));
+ if(navigator.vibrate)navigator.vibrate(8);return true}
+function wheelMove(y){if(!WH)return;const t=performance.now();WH.last.push([t,y]);if(WH.last.length>5)WH.last.shift();
+ const max=Math.round(WH.spec.max/WH.spec.step);WH.pos=Math.max(0,Math.min(max,WH.start+(WH.y0-y)/WROW));wheelDraw()}
+function wheelDraw(){drawDrum(WH.el,WH.spec,WH.pos,WH.f==='w',WH.bw);const i=Math.round(WH.pos);if(i!==WH.idx){if(WH.idx!==null&&navigator.vibrate)navigator.vibrate(4);WH.idx=i}}
+function wheelRelease(){if(!WH)return;const L=WH.last;let v=0;if(L.length>1){const [t0,y0]=L[0],[t1,y1]=L[L.length-1];if(t1-t0>0&&performance.now()-t1<80)v=(y0-y1)/WROW/(t1-t0)}
+ const max=Math.round(WH.spec.max/WH.spec.step);let prev=performance.now();
+ const step=now=>{const dt=now-prev;prev=now;if(Math.abs(v)>.002){WH.pos=Math.max(0,Math.min(max,WH.pos+v*dt));v*=Math.pow(.994,dt);wheelDraw();WH.raf=requestAnimationFrame(step);return}
+  const target=Math.round(WH.pos);if(Math.abs(target-WH.pos)>.01){WH.pos+=(target-WH.pos)*Math.min(1,dt/80);wheelDraw();WH.raf=requestAnimationFrame(step);return}
+  WH.pos=target;wheelDraw();wheelCommit()};WH.raf=requestAnimationFrame(step)}
+function wheelCommit(){const W=WH;if(!W)return;const val=fmtW(Math.round(W.pos)*W.spec.step);W.st[W.f]=String(val);if(W.f==='w')W.st.u=S.settings.unit;save();
+ setTimeout(()=>{W.pk.classList.remove('on');W.card.classList.remove('focus');W.row.classList.remove('frow');W.dim.forEach(x=>x.classList.remove('fxdim'));W.inp.readOnly=false;
+  setTimeout(()=>{if(WH===W)WH=null;render()},300)},350)}
+// touch: hold briefly then drag; a quick tap still opens the keyboard
+let TH=null;
+document.addEventListener('touchstart',ev=>{const t=ev.target.closest&&ev.target.closest('input.num');if(!t||t.disabled||WH)return;const p=ev.touches[0];
+ TH={t,x:p.clientX,y:p.clientY,armed:false,timer:setTimeout(()=>{if(TH&&TH.t===t&&wheelOpen(t,TH.y))TH.armed=true},180)}},{passive:true});
+document.addEventListener('touchmove',ev=>{if(!TH)return;const p=ev.touches[0];if(!TH.armed){if(Math.hypot(p.clientX-TH.x,p.clientY-TH.y)>8){clearTimeout(TH.timer);TH=null}return}ev.preventDefault();wheelMove(p.clientY)},{passive:false});
+document.addEventListener('touchend',ev=>{if(!TH)return;clearTimeout(TH.timer);if(TH.armed){ev.preventDefault();wheelRelease()}TH=null},{passive:false});
+document.addEventListener('touchcancel',()=>{if(TH){clearTimeout(TH.timer);if(TH.armed)wheelRelease();TH=null}});
+// mouse (desktop): drag up/down on a number
+let MH=null;
+document.addEventListener('mousedown',ev=>{const t=ev.target.closest&&ev.target.closest('input.num');if(!t||t.disabled||WH)return;MH={t,y:ev.clientY,on:false}});
+document.addEventListener('mousemove',ev=>{if(!MH)return;if(!MH.on){if(Math.abs(ev.clientY-MH.y)>6&&wheelOpen(MH.t,MH.y))MH.on=true;else return}ev.preventDefault();wheelMove(ev.clientY)});
+document.addEventListener('mouseup',()=>{if(MH&&MH.on)wheelRelease();MH=null});
+
 /* ---------- modal ---------- */
 let modalResolve=null,PICK_CB=null;
 function openModal(html){$('#sheet').innerHTML=html;$('#modal').classList.add('on')}
@@ -486,7 +556,9 @@ function renderHome(){const s=S.settings,now=new Date(),lvl=s.level;
  return cols(`${missCard}${hero}<div class="last">${lastLine}</div>${weekCard}`,prog)}
 
 const fmtW=n=>Math.round(n*10)/10;
-function setTxt(st,id){const w=parseFloat(st.w)||0,r=st.r||'0';if(id==='plank')return `${r} s`;if(!w)return `${r} reps`;return `${fmtW(conv(w,st.u,S.settings.unit))} ${S.settings.unit} × ${r}`}
+const BW=new Set(['pullup','pushup','dips','plank','hlr','deadbug','abwheel']);
+function canToggle(e,si){const st=e.sets[si];if(st.d)return si===e.sets.length-1||!e.sets[si+1].d;return si===0||e.sets[si-1].d}
+function setTxt(st,id){const w=parseFloat(st.w)||0,r=st.r||'0';if(id==='plank')return `${r} s`;if(!w)return `${r} reps`;if(BW.has(id))return `${r} reps +${fmtW(conv(w,st.u,S.settings.unit))} ${S.settings.unit}`;return `${fmtW(conv(w,st.u,S.settings.unit))} ${S.settings.unit} × ${r}`}
 function topSet(sets){let b=null;sets.forEach(x=>{const kg=conv(x.w,x.u,'kg'),r=parseFloat(x.r)||0;if(!b||kg>b.kg||(kg===b.kg&&r>b.r))b={kg,r,s:x}});return b}
 function exNote(id){const last=lastSets(id);if(!last||!last.length)return '';let t='Last: '+setTxt(topSet(last).s,id);
  const first=S.history[0];if(first&&Date.now()-first.start>=14*DAY){const all=[];S.history.forEach(h=>h.ex.forEach(e=>{if(e.id===id)e.sets.forEach(x=>{if(x.d)all.push(x)})}));const b=topSet(all);if(b)t+=' · Best: '+setTxt(b.s,id)}
@@ -497,8 +569,8 @@ function exCardList(w,key,ed){return w.ex.map((e,ei)=>{const n=e.sets.length,dn=
  ${ed?`<button class="icon" data-act="exmenu" ${at}>⋯</button>`:''}</div>
  <div class="setrow head"><span>✓</span><span>Set</span><span>Weight</span><span></span><span>${e.id==='plank'?'Sec':'Reps'}</span><span></span></div>
  ${e.sets.map((s,si)=>{const a=`${at} data-s="${si}"`;return `<div class="setrow ${s.d?'done':''}">
-  <button class="chk ${s.d?'on':''}" data-act="check" ${a} ${ed?'':'disabled'} aria-label="Mark set done">✓</button><span class="sn">${si+1}</span>
-  <input class="num" inputmode="decimal" data-f="w" ${a} value="${esc(s.w)}" placeholder="0" ${ed?'':'disabled'}>
+  <button class="chk ${s.d?'on':''} ${ed&&!canToggle(e,si)?'off':''}" data-act="check" ${a} ${ed&&canToggle(e,si)?'':'disabled'} aria-label="Mark set done">✓</button><span class="sn">${si+1}</span>
+  <input class="num" inputmode="decimal" data-f="w" ${a} value="${esc(s.w)}" placeholder="${BW.has(e.id)?'BW':'0'}" ${ed?'':'disabled'}>
   <span class="unit">${s.u}</span>
   <input class="num" inputmode="numeric" data-f="r" ${a} value="${esc(s.r)}" placeholder="${esc(s.p||e.target)}" ${ed?'':'disabled'}>
   ${ed?`<button class="x" data-act="delset" ${a} aria-label="Remove set">×</button>`:'<span></span>'}</div>`}).join('')}
@@ -506,7 +578,7 @@ function exCardList(w,key,ed){return w.ex.map((e,ei)=>{const n=e.sets.length,dn=
 function splitCards(cards,tail){if(!isWide())return cols(cards.join('')+tail);const L=cards.filter((_,i)=>i%2===0),R=cards.filter((_,i)=>i%2===1);return cols(L.join('')+(L.length<=R.length?tail:''),R.join('')+(L.length>R.length?tail:''))}
 
 function renderWorkout(){const w=S.active;if(!w){UI.view='home';return renderHome()}
- return `<div class="wtop"><button class="icon" data-act="nav" data-v="home" aria-label="Back">‹</button><div class="sp"><div class="t">${esc(w.dayName)}</div><div class="small muted"><span id="elapsed">${mmss(elapsed(w)/1000)}</span> · ${countDone(w)}/${countSets(w)} sets</div></div>
+ return `<div class="wtop"><button class="icon" data-act="nav" data-v="home" aria-label="Back">‹</button><div class="sp"><div class="t">${esc(w.dayName)}</div><div class="small muted">${countDone(w)}/${countSets(w)} sets</div></div>
   <button class="pill" id="awake" data-act="awake"></button><button class="btn" data-act="finish">Finish</button></div>
   ${splitCards(exCardList(w,'A',true),`<div class="exfoot"><button class="ghost" data-act="addex">+ Add exercise</button></div>
   <div class="small muted" style="text-align:center;margin-top:14px">Rest timer: ${mmss(S.settings.rest)} · starts when you tick a set</div>`)}`}
@@ -525,6 +597,7 @@ function renderHist(){const w=S.history.find(h=>h.id===UI.hist);if(!w){UI.view='
  ${ed?'':'<div class="small muted" style="margin:0 4px 10px">Workouts lock 24 hours after you finish them.</div>'}
  ${splitCards(exCardList(w,w.id,ed),ed?`<div class="exfoot"><button class="ghost" data-act="histaddex">+ Add exercise</button><button class="ghost" style="color:var(--danger)" data-act="histdel">Delete workout</button></div>`:'')}`}
 
+function bestOf(st){let b=null;Object.values(st.best).forEach(x=>{if(x.kg<=0)return;if(!b||x.kg>b.kg||(x.kg===b.kg&&x.r>b.r))b=x});return b}
 function calcStats(y,m){const list=S.history.filter(h=>{const d=new Date(h.start);return d.getFullYear()===y&&d.getMonth()===m});const u=S.settings.unit,dim=new Date(y,m+1,0).getDate();
  const st={list,count:list.length,mins:0,sets:0,vol:0,mus:{},wk:[0,0,0,0,0],wkc:[0,0,0,0,0],best:{},target:Math.max(1,Math.round(S.settings.goal*dim/7))};
  list.forEach(w=>{st.mins+=wDur(w)/6e4;const wi=Math.min(4,Math.floor((new Date(w.start).getDate()-1)/7));const v=volume(w,u);st.vol+=v;st.wk[wi]+=v;st.wkc[wi]++;
@@ -537,13 +610,12 @@ function renderStats(){const {y,m}=UI.month,st=calcStats(y,m),u=S.settings.unit;
  const bars=`<svg width="100%" viewBox="0 0 ${5*bw+4*gap} ${H+38}">${st.wk.map((v,i)=>{const h=v/mx*H;return `<rect x="${i*(bw+gap)}" y="${H-h}" width="${bw}" height="${Math.max(h,2)}" rx="8" fill="${v?'var(--accent)':'var(--card2)'}"/>
   <text x="${i*(bw+gap)+bw/2}" y="${H-h-6}" text-anchor="middle" fill="var(--muted)" font-size="11">${v?fmtNum(v):''}</text><text x="${i*(bw+gap)+bw/2}" y="${H+16}" text-anchor="middle" fill="var(--muted)" font-size="11">Wk ${i+1}</text><text x="${i*(bw+gap)+bw/2}" y="${H+31}" text-anchor="middle" fill="var(--text)" font-size="11" font-weight="700">${st.wkc[i]}×</text>`}).join('')}</svg>`;
  const leg=Object.entries(st.mus).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div><i style="background:${MCOL[MUSCLES.indexOf(k)]}"></i>${k} <span class="muted">${v}</span></div>`).join('');
- const bl=Object.values(st.best).sort((a,b)=>MUSCLES.indexOf(a.m)-MUSCLES.indexOf(b.m));let cm='';
- const best=(UI.bestAll?bl:bl.slice(0,6)).map(b=>{let h='';if(b.m!==cm){cm=b.m;h=`<div class="bgroup"><i style="background:${MCOL[MUSCLES.indexOf(b.m)]}"></i>${b.m}</div>`}return h+`<div class="row small brow"><span class="sp">${esc(b.name)}</span><span>${setTxt(b.s,b.id)} · <span class="muted">${fmtDate(b.t)}</span></span></div>`}).join('')+(bl.length>6?`<button class="ghost" style="margin-top:10px;width:100%" data-act="bestall">${UI.bestAll?'Show less':'Show all '+bl.length}</button>`:'');
+ const bestLift=bestOf(st);
+ const bestCard=`<div class="card bestlift"><div class="blabel">🏆 Best lift this month</div>${bestLift?`<div class="bname">${esc(bestLift.name)}</div><div class="bset">${setTxt(bestLift.s,bestLift.id)}</div><div class="small muted">${fmtDate(bestLift.t)}</div>`:'<div class="small muted" style="margin-top:6px">Your heaviest set of the month shows here.</div>'}</div>`;
  return `<div class="row"><h1 class="sp">Stats</h1><button class="icon" data-act="mprev">‹</button><b style="min-width:130px;text-align:center">${mn}</b><button class="icon" data-act="mnext">›</button></div>
  ${cols(`<div class="kpis"><div class="kpi"><b>${st.count}</b><span>workouts</span></div><div class="kpi"><b>${fmtDur(st.mins*6e4).replace(' min','m')}</b><span>time trained</span></div><div class="kpi"><b>${st.sets}</b><span>sets done</span></div><div class="kpi"><b>${fmtNum(st.vol)}</b><span>${u} volume</span></div></div>
  <div class="card"><b>Monthly goal</b><div class="row" style="margin-top:10px">${ring(st.count/st.target,130,14,Math.round(Math.min(1,st.count/st.target)*100)+'%',st.count+' of '+st.target)}<div class="small muted sp">Target is your ${S.settings.goal}-day weekly goal across this month.</div></div></div>
- <div class="card"><b>Sets by muscle</b><div class="row" style="margin-top:10px;align-items:center">${st.sets?donut(st,130):'<div class="muted small">No sets this month yet.</div>'}<div class="legend sp">${leg}</div></div></div>`,`<div class="card"><b>Volume per week</b> <span class="small muted">(${u} · workouts)</span><div style="margin-top:10px">${bars}</div></div>
- <div class="card"><b>Best sets this month</b><div style="margin-top:4px">${best||'<div class="small muted" style="margin-top:6px">Your best set for each exercise shows here.</div>'}</div></div>
+ ${bestCard}`,`<div class="card"><b>Volume per week</b> <span class="small muted">(${u} · workouts)</span><div style="margin-top:10px">${bars}</div></div>
  <div class="exfoot"><button class="btn sp" data-act="exportimg">Export image</button><button class="btn2 sp" data-act="exportcsv">Export data</button></div>`)}`}
 
 function planSettings(){const s=S.settings,lvl=s.level,rot=rotation();
@@ -594,7 +666,7 @@ async function finishWorkout(){const w=S.active;const dn=countDone(w);
  if(!await confirmBox('Finish workout?',`${dn}/${countSets(w)} sets done in ${fmtDur(elapsed(w))}. Unticked sets won't count in stats.`,'Finish'))return;
  w.dur=elapsed(w);w.end=Date.now();delete w.paused;S.history.push(w);S.active=null;nat('workoutEnd');
  const r=rotation(w.level),i=r.findIndex(d=>d.id===w.dayId);if(i>=0)S.rot[w.level]=i+1;S.due=nextTrain(addDay(day0()));
- skipRest();save(true);UI.view='home';render();wantAwake();toast('Workout saved 💪')}
+ skipRest();save(true);UI.view='home';render();wantAwake();toast('Workout saved · '+fmtDur(wDur(w))+' 💪')}
 function download(name,blob){if(NATIVE){const r=new FileReader();r.onload=()=>nat('share',name,blob.type||'application/octet-stream',String(r.result).split(',')[1]);r.readAsDataURL(blob);return}
  const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),4000)}
 function csvFor(list){const rows=[['date','time','workout','exercise','muscle','set','weight','unit','reps','done']];
@@ -614,13 +686,13 @@ function drawStats(mode){const reel=mode==='reel',{y,m}=UI.month,st=calcStats(y,
   rr(X,Y,w,150,26,card,1);x.fillStyle=tx;x.font='800 50px system-ui,sans-serif';x.fillText(v[0],X+26,Y+80);x.fillStyle=mu;x.font='500 26px system-ui,sans-serif';x.fillText(v[1],X+26,Y+122)});
  rr(70,430+D,460,460,30,card,1);rr(550,430+D,460,460,30,card,1);
  const arc=(cx,cy,r,a0,a1,col,lw,cap)=>{x.strokeStyle=col;x.lineWidth=lw;x.lineCap=cap||'butt';x.beginPath();x.arc(cx,cy,r,a0,a1);x.stroke()};
- x.fillStyle=tx;x.font='700 30px system-ui,sans-serif';x.fillText('Monthly goal',100,485+D);x.fillText('Sets by muscle',580,485+D);
+ x.fillStyle=tx;x.font='700 30px system-ui,sans-serif';x.fillText('Monthly goal',100,485+D);x.fillStyle=s.accent;x.fillText('🏆 Best lift',580,485+D);x.fillStyle=tx;
  const p=Math.min(1,st.count/st.target);arc(300,680+D,140,0,Math.PI*2,c2,34);if(p>0)arc(300,680+D,140,-Math.PI/2,-Math.PI/2+Math.PI*2*p,s.accent,34,'round');
  x.textAlign='center';x.fillStyle=tx;x.font='800 64px system-ui,sans-serif';x.fillText(Math.round(p*100)+'%',300,695+D);x.fillStyle=mu;x.font='500 26px system-ui,sans-serif';x.fillText(st.count+' of '+st.target,300,740+D);
- const ent=Object.entries(st.mus).sort((a,b)=>b[1]-a[1]),tot=ent.reduce((a,b)=>a+b[1],0);arc(700,680+D,100,0,Math.PI*2,c2,40);let a=-Math.PI/2;
- ent.forEach(([mm,v])=>{const a1=a+Math.PI*2*v/tot;arc(700,680+D,100,a,a1-.03,MCOL[MUSCLES.indexOf(mm)],40);a=a1});
- x.fillStyle=tx;x.font='800 48px system-ui,sans-serif';x.fillText(tot,700,695+D);x.textAlign='left';
- ent.slice(0,6).forEach(([mm],i)=>{x.fillStyle=MCOL[MUSCLES.indexOf(mm)];x.fillRect(850,560+D+i*44,18,18);x.fillStyle=tx;x.font='500 24px system-ui,sans-serif';x.fillText(mm.slice(0,9),876,578+D+i*44)});
+ x.textAlign='left';const bl=bestOf(st);
+ if(bl){x.fillStyle=tx;x.font='800 40px system-ui,sans-serif';const words=bl.name.split(' ');let line='',ly=600+D;words.forEach(wd=>{const tt=line?line+' '+wd:wd;if(x.measureText(tt).width>400&&line){x.fillText(line,580,ly);line=wd;ly+=50}else line=tt});x.fillText(line,580,ly);
+  x.font='900 60px system-ui,sans-serif';x.fillText(setTxt(bl.s,bl.id),580,ly+90);x.fillStyle=mu;x.font='500 28px system-ui,sans-serif';x.fillText(fmtDate(bl.t),580,ly+140)}
+ else{x.fillStyle=mu;x.font='500 28px system-ui,sans-serif';x.fillText('No lifts yet',580,680+D)}
  rr(70,910+D,940,360,30,card,1);x.fillStyle=tx;x.font='700 30px system-ui,sans-serif';x.fillText('Volume per week ('+u+')',100,965+D);
  const mx=Math.max(1,...st.wk);st.wk.forEach((v,i)=>{const bh=v/mx*180,X=120+i*176;rr(X,1180+D-Math.max(bh,4),120,Math.max(bh,4),14,v?s.accent:c2);x.textAlign='center';x.fillStyle=mu;x.font='500 24px system-ui,sans-serif';x.fillText('Week '+(i+1),X+60,1222+D);x.fillStyle=tx;x.font='700 24px system-ui,sans-serif';if(v)x.fillText(fmtNum(v),X+60,1168+D-bh);x.fillText(st.wkc[i]+' workouts',X+60,1254+D);x.textAlign='left'});
  return c}
@@ -653,8 +725,10 @@ const ACT={
  finish:()=>finishWorkout(),
  awake:()=>{S.settings.awake=S.settings.awake==='off'?'workout':'off';save();wantAwake();poke();toast(S.settings.awake==='off'?'Screen follows phone settings':'Screen stays on, dims after 15 s')},
  alertok:()=>hideAlert(),
- check:b=>{const w=getW(b.dataset.w),e=w.ex[b.dataset.e],s=e.sets[b.dataset.s];s.d=!s.d;
-  if(s.d&&!s.r)s.r=s.p||String(parseInt(e.target)||'');save();render();if(b.dataset.w==='A'){if(s.d)startRest(S.settings.rest);else skipRest()}},
+ check:b=>{const w=getW(b.dataset.w),e=w.ex[b.dataset.e],si=+b.dataset.s,s=e.sets[si];if(!canToggle(e,si))return;
+  if(!s.d){const noW=!BW.has(e.id)&&!(parseFloat(s.w)>0),noR=!(parseFloat(s.r)>0);
+   if(noW||noR)return toast(noW&&noR?'Enter weight and reps first':noW?'Enter the weight first':(e.id==='plank'?'Enter the seconds first':'Enter the reps first'))}
+  s.d=!s.d;save();render();if(b.dataset.w==='A'){if(s.d)startRest(S.settings.rest);else skipRest()}},
  addset:b=>{const w=getW(b.dataset.w),e=w.ex[b.dataset.e],l=e.sets[e.sets.length-1];e.sets.push({w:l?l.w:'',u:S.settings.unit,r:'',p:l?(l.r||l.p):'',d:false});save();render()},
  delset:b=>{const w=getW(b.dataset.w),e=w.ex[b.dataset.e];e.sets.splice(b.dataset.s,1);save();render()},
  exmenu:b=>{const k=b.dataset.w,ei=b.dataset.e,e=getW(k).ex[ei];openModal(`<div class="mhead"><b>${esc(e.name)}</b><button class="icon" data-act="mclose">✕</button></div>
