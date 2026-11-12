@@ -3,12 +3,15 @@ package nz.gaurav.gymflow
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.NotificationManager
+import android.content.ContentValues
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Color
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Base64
 import android.view.WindowManager
@@ -214,6 +217,32 @@ class MainActivity : ComponentActivity() {
 
         @JavascriptInterface
         fun cancelRest() = Rest.cancel(this@MainActivity)
+
+        @JavascriptInterface
+        fun restFired() = Rest.firedByApp(this@MainActivity)
+
+        /** Saves a PNG into Pictures/GymFlow so it shows in the Gallery. */
+        @JavascriptInterface
+        fun saveImage(name: String, b64: String): Boolean {
+            return try {
+                val bytes = Base64.decode(b64, Base64.DEFAULT)
+                if (Build.VERSION.SDK_INT >= 29) {
+                    val values = ContentValues().apply {
+                        put(MediaStore.Images.Media.DISPLAY_NAME, name)
+                        put(MediaStore.Images.Media.MIME_TYPE, "image/png")
+                        put(MediaStore.Images.Media.RELATIVE_PATH, Environment.DIRECTORY_PICTURES + "/GymFlow")
+                    }
+                    val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values) ?: return false
+                    contentResolver.openOutputStream(uri)?.use { it.write(bytes) } ?: return false
+                    true
+                } else {
+                    share(name, "image/png", b64)
+                    true
+                }
+            } catch (e: Exception) {
+                false
+            }
+        }
 
         @JavascriptInterface
         fun restEnd(): Double = Rest.prefs(this@MainActivity).getLong(Rest.K_END, 0L).toDouble()

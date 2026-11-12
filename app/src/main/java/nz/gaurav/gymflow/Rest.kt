@@ -22,8 +22,8 @@ import java.io.File
 /**
  * The rest timer that keeps working when you leave the app:
  *  - an alarm fires exactly when rest ends (even with the screen off)
- *  - a notification shows a live countdown with -15 / +15 / Skip
- *  - when rest ends it plays your sound, vibrates and shows "Let's go!"
+ *  - a notification shows a live countdown with -15 / +15 / Skip (only while resting)
+ *  - when rest ends it plays your sound once, vibrates and shows "Let's go!"
  */
 object Rest {
     const val CH_LIVE = "workout"
@@ -68,6 +68,23 @@ object Rest {
 
     fun setWorkout(c: Context, name: String, start: Long) {
         prefs(c).edit().putString(K_NAME, name).putLong(K_START, start).apply()
+    }
+
+    /** Only one caller can end a rest: the first to arrive wins, everyone after does nothing. */
+    @Synchronized
+    private fun claim(c: Context): Boolean {
+        val p = prefs(c)
+        if (p.getLong(K_END, 0L) == 0L) return false
+        p.edit().putLong(K_END, 0L).commit()
+        return true
+    }
+
+    /** The app's own clock reached zero first (app open): ring once and cancel the alarm. */
+    fun firedByApp(c: Context) {
+        if (!claim(c)) return
+        alarmManager(c).cancel(firePending(c))
+        playSound(c)
+        if (prefs(c).getBoolean(K_VIBRATE, true)) vibrate(c)
         show(c)
     }
 
@@ -124,9 +141,8 @@ object Rest {
     /** Rest is over. */
     fun fire(c: Context) {
         val p = prefs(c)
-        if (p.getLong(K_END, 0L) == 0L) return // skipped in the meantime
         val label = p.getString(K_LABEL, "") ?: ""
-        p.edit().putLong(K_END, 0L).apply()
+        if (!claim(c)) return // skipped, or the app already rang for this rest
 
         playSound(c)
         if (p.getBoolean(K_VIBRATE, true)) vibrate(c)
@@ -172,14 +188,15 @@ object Rest {
 
     fun show(c: Context) {
         val p = prefs(c)
-        val name = p.getString(K_NAME, null)
-        if (name == null) {
+        val name = p.getString(K_NAME, null) ?: "Workout"
+        val now = System.currentTimeMillis()
+        val end = p.getLong(K_END, 0L)
+        // Only show a notification while a rest countdown is running.
+        if (end <= now) {
             nm(c).cancel(LIVE_ID)
             return
         }
         channels(c)
-        val now = System.currentTimeMillis()
-        val end = p.getLong(K_END, 0L)
         val open = PendingIntent.getActivity(
             c, 0,
             Intent(c, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
@@ -195,21 +212,13 @@ object Rest {
             .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
             .setShowWhen(true)
             .setUsesChronometer(true)
-
-        if (end > now) {
-            b.setContentTitle("Resting · $name")
-                .setContentText(p.getString(K_LABEL, "") ?: "")
-                .setWhen(end)
-                .setChronometerCountDown(true)
-                .addAction(0, "−15 s", actionPending(c, ACT_MINUS, 11))
-                .addAction(0, "+15 s", actionPending(c, ACT_PLUS, 12))
-                .addAction(0, "Skip", actionPending(c, ACT_SKIP, 13))
-        } else {
-            b.setContentTitle(name)
-                .setContentText("Workout in progress")
-                .setWhen(p.getLong(K_START, now))
-                .setChronometerCountDown(false)
-        }
+            .setContentTitle("Resting · $name")
+            .setContentText(p.getString(K_LABEL, "") ?: "")
+            .setWhen(end)
+            .setChronometerCountDown(true)
+            .addAction(0, "−15 s", actionPending(c, ACT_MINUS, 11))
+            .addAction(0, "+15 s", actionPending(c, ACT_PLUS, 12))
+            .addAction(0, "Skip", actionPending(c, ACT_SKIP, 13))
         try { nm(c).notify(LIVE_ID, b.build()) } catch (e: SecurityException) { }
     }
 
