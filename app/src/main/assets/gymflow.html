@@ -763,6 +763,11 @@ function renderDayEdit(){const d=S.customDays.find(x=>x.id===UI.dayEdit);if(!d){
 
 /* ---------- actions ---------- */
 function startWorkout(d){S.active=d?buildWorkout(d):{id:uid(),level:S.settings.level,intensity:S.settings.intensity,dayId:null,dayName:'Quick workout',sub:'',start:Date.now(),end:null,ex:[]};S.pick=null;save(true);nat('workoutStart',S.active.dayName,S.active.start);UI.view='workout';render();wantAwake();window.scrollTo(0,0)}
+/* changing the plan closes any open workout: saved if sets were done, dropped if not */
+async function closeForPlanChange(){const w=S.active;if(!w)return true;const dn=countDone(w);
+ if(dn){if(!await confirmBox('Change your plan?',`Your open ${esc(w.dayName)} workout (${dn} set${dn>1?'s':''} done) will be saved to History first.`,'Save and change'))return false;
+  w.dur=elapsed(w);w.end=Date.now();delete w.paused;S.history.push(w)}
+ S.active=null;skipRest();nat('workoutEnd');save(true);wantAwake();return true}
 async function finishWorkout(){const w=S.active;const dn=countDone(w);
  if(!dn){if(await confirmBox('Discard workout?','No sets are ticked, so there is nothing to save.','Discard',true)){S.active=null;skipRest();nat('workoutEnd');save(true);UI.view='home';render();wantAwake()}return}
  if(!await confirmBox('Finish workout?',`${dn}/${countSets(w)} sets done in ${fmtDur(elapsed(w))}. Unticked sets won't count in stats.`,'Finish'))return;
@@ -815,8 +820,8 @@ const ACT={
  quickstart:()=>startWorkout(null),
  change:()=>{const lv=S.settings.level;openModal(`<div class="mhead"><b>Pick today's workout</b><button class="icon" data-act="mclose">✕</button></div>${allDays(lv).map(d=>`<button class="prow" data-act="pickday" data-id="${d.id}">${esc(d.name)}<small>${esc(d.sub)}</small></button>`).join('')}<button class="prow quick" data-act="quickstart">Empty workout (quick add)</button>`)},
  pickday:b=>{S.pick=b.dataset.id;save();closeModal();render();window.scrollTo({top:0,behavior:'smooth'})},
- level:b=>{S.settings.level=b.dataset.k;S.pick=null;S.due=nextTrain(day0());save();render()},
- intensity:b=>{S.settings.intensity=b.dataset.k;save();render()},
+ level:async b=>{const k=b.dataset.k;if(k===S.settings.level)return;if(!await closeForPlanChange())return;S.settings.level=k;S.pick=null;S.due=nextTrain(day0());save();render()},
+ intensity:async b=>{const k=b.dataset.k;if(k===S.settings.intensity)return;if(!await closeForPlanChange())return;S.settings.intensity=k;save();render()},
  goal:b=>{const g=Math.max(1,Math.min(7,S.settings.goal+ +b.dataset.d));S.settings.goal=g;S.settings.tdays=DEF_DAYS[g].slice();S.due=nextTrain(day0());save();render()},
  tday:b=>{const i=+b.dataset.i,t=S.settings.tdays;const k=t.indexOf(i);if(k>=0){if(t.length>1)t.splice(k,1)}else{t.push(i);t.sort()}S.settings.goal=t.length;S.due=nextTrain(day0());save();render()},
  wnext:()=>{UI.wstep=2;render();window.scrollTo(0,0)},
