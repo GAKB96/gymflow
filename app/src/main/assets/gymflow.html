@@ -230,6 +230,8 @@ body.light .wpick .pband{background:rgba(20,23,28,.08)}
 .bigw{font-size:44px;font-weight:900;letter-spacing:-.03em;line-height:1;display:inline-block}.bigw small{font-size:18px;font-weight:700;color:var(--muted);margin-left:4px}
 .seg.eq button{flex:1;text-align:center;padding:10px 4px}
 #pname{width:150px;text-align:right;padding:9px 12px}
+.dim{touch-action:none;overscroll-behavior:contain}
+html.nodrag,html.nodrag body,html.nodrag .col{overflow:hidden!important;touch-action:none}
 </style>
 </head>
 <body>
@@ -429,12 +431,13 @@ async function wantAwake(){const a=S.settings.awake,need=a==='always'||(a==='wor
  if(need&&!WL&&'wakeLock' in navigator&&document.visibilityState==='visible'){try{WL=await navigator.wakeLock.request('screen');WL.addEventListener('release',()=>{WL=null;updAwake()})}catch(e){WL=null}}
  if(!need&&WL){try{await WL.release()}catch(e){}WL=null}updAwake()}
 function updAwake(){const el=$('#awake');if(!el)return;el.classList.toggle('on',!!WL);el.textContent=S.settings.awake==='off'?'◐ Screen auto':'☀ Screen on';el.classList.toggle('on',S.settings.awake!=='off')}
-let idleT,dimmed=false;function setDim(on){if(on===dimmed)return;dimmed=on;$('#dim').classList.toggle('on',on);nat('setDim',on)}
+let idleT,dimmed=false;function setDim(on){if(on===dimmed)return;dimmed=on;document.documentElement.classList.toggle('nodrag',on);$('#dim').classList.toggle('on',on);nat('setDim',on)}
 function undim(){setDim(false)}
 function poke(){undim()}
 
 ['pointerdown','pointerup','touchstart','touchend','mousedown'].forEach(t=>$('#dim').addEventListener(t,e=>{e.stopPropagation()},{capture:true}));
 $('#dim').addEventListener('click',e=>{e.stopPropagation();e.preventDefault();undim()});
+['touchmove','wheel'].forEach(t=>$('#dim').addEventListener(t,e=>{e.preventDefault();e.stopPropagation()},{passive:false}));
 function showAlert(){let nx=null;if(S.active){for(const e of S.active.ex){const i=e.sets.findIndex(s=>!s.d);if(i>=0){nx={e,i};break}}}
  $('#anext').textContent=nx?nx.e.name:'All sets done';$('#anext2').textContent=nx?`Set ${nx.i+1} of ${nx.e.sets.length}`+(nx.e.sets[nx.i].w?` · ${nx.e.sets[nx.i].w} ${nx.e.sets[nx.i].u}`:''):'Tap Finish to save your workout';
  undim();clearTimeout(idleT);clearTimeout(alertT);const a=$('#alert');a.classList.remove('out');a.classList.add('on');alertT=setTimeout(hideAlert,5000)}
