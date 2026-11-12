@@ -178,8 +178,8 @@ select.field{width:auto;padding:8px 10px}
 :root{color-scheme:dark;--glass:rgba(255,255,255,.07);--glassb:rgba(255,255,255,.14);--card2:rgba(255,255,255,.08);--line:rgba(255,255,255,.1)}
 html.light{color-scheme:light}
 body.light{--glass:rgba(255,255,255,.55);--glassb:rgba(255,255,255,.85);--card2:rgba(20,23,28,.06);--line:rgba(20,23,28,.08)}
-html{background:radial-gradient(45% 32% at 12% 8%,color-mix(in srgb,var(--accent) 55%,transparent),transparent 75%),radial-gradient(40% 32% at 92% 35%,rgba(120,90,255,.45),transparent 75%),radial-gradient(50% 38% at 25% 88%,rgba(0,170,255,.3),transparent 75%),#0b0d12;background-attachment:fixed;min-height:100%}
-html.light{background:radial-gradient(45% 32% at 12% 8%,color-mix(in srgb,var(--accent) 35%,transparent),transparent 75%),radial-gradient(40% 32% at 92% 35%,rgba(140,110,255,.25),transparent 75%),radial-gradient(50% 38% at 25% 88%,rgba(0,170,255,.2),transparent 75%),#eef0f5;background-attachment:fixed}
+html{background:radial-gradient(90% 38% at 50% -6%,color-mix(in srgb,var(--accent) 28%,transparent),transparent 72%),#0b0d12;background-attachment:fixed;min-height:100%}
+html.light{background:radial-gradient(90% 38% at 50% -6%,color-mix(in srgb,var(--accent) 18%,transparent),transparent 72%),#eef0f5;background-attachment:fixed}
 html body{background:transparent}
 .card,.kpi,#rest{background:var(--glass);border:1px solid var(--glassb);backdrop-filter:blur(22px) saturate(160%);-webkit-backdrop-filter:blur(22px) saturate(160%);box-shadow:inset 0 1px 0 rgba(255,255,255,.1)}
 .kpi{border-radius:14px}
@@ -604,7 +604,7 @@ function drawStats(mode){const reel=mode==='reel',{y,m}=UI.month,st=calcStats(y,
  const W=1080,H=reel?1920:1350,c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
  const bg=light?'#eef0f5':'#0b0d12',card=light?'rgba(255,255,255,.62)':'rgba(255,255,255,.07)',edge=light?'rgba(255,255,255,.9)':'rgba(255,255,255,.14)',c2=light?'rgba(20,23,28,.08)':'rgba(255,255,255,.1)',tx=light?'#14171c':'#f2f4f7',mu=light?'#6b7280':'#8b93a1';
  x.fillStyle=bg;x.fillRect(0,0,W,H);
- [[.12,.08,s.accent,.55],[.92,.35,'#7a5aff',.45],[.25,.88,'#00aaff',.3]].forEach(([fx,fy,col,al])=>{const g=x.createRadialGradient(fx*W,fy*H,0,fx*W,fy*H,W*.62);g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');x.globalAlpha=light?al*.6:al;x.fillStyle=g;x.fillRect(0,0,W,H);x.globalAlpha=1});
+ [[.5,-.04,s.accent,.32]].forEach(([fx,fy,col,al])=>{const g=x.createRadialGradient(fx*W,fy*H,0,fx*W,fy*H,W*.8);g.addColorStop(0,col);g.addColorStop(1,'rgba(0,0,0,0)');x.globalAlpha=light?al*.6:al;x.fillStyle=g;x.fillRect(0,0,W,H);x.globalAlpha=1});
  const rr=(X,Y,w,h,r,f,line)=>{x.fillStyle=f;x.beginPath();x.roundRect?x.roundRect(X,Y,w,h,r):x.rect(X,Y,w,h);x.fill();if(line){x.strokeStyle=edge;x.lineWidth=2;x.stroke()}};
  const T=reel?170:0,D=reel?340:0;
  x.fillStyle=s.accent;x.font='800 34px system-ui,sans-serif';x.fillText('GYMFLOW',70,110+T);
