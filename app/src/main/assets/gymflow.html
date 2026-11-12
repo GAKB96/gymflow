@@ -215,6 +215,8 @@ body.light .wpick .pband{background:rgba(20,23,28,.08)}
 .wpick .wh{position:relative;height:100%;transform-style:preserve-3d;perspective:600px}
 .wpick .n{position:absolute;left:0;right:0;top:50%;height:38px;margin-top:-19px;display:grid;place-items:center;backface-visibility:hidden}
 .wpick .pu{position:relative;z-index:1;text-align:center;font-size:13px;font-weight:700}
+#wcap{position:fixed;inset:0;z-index:30;touch-action:none;cursor:ns-resize}
+.num[readonly]{cursor:pointer}
 </style>
 </head>
 <body>
@@ -349,7 +351,9 @@ function dayPlan(d,lvl=S.settings.level,int=S.settings.intensity){
  if(lvl==='custom')return d.ex.map(id=>({id,sets:d.sets||3,target:id==='plank'?'30-45':'8-12'}));
  const P=PROGRAMS[lvl];return d.ex.slice(0,P.counts[int]).map(id=>({id,sets:P.sets[int],target:id==='plank'?'30-45':(EX[id].c?P.repsC:P.reps)}))}
 function lastSets(id){for(let i=S.history.length-1;i>=0;i--){const e=S.history[i].ex.find(x=>x.id===id&&x.sets.some(s=>s.d));if(e)return e.sets.filter(s=>s.d)}return null}
-function mkEx(id,n,target){const last=lastSets(id),sets=[];for(let i=0;i<n;i++){const l=last&&(last[i]||last[last.length-1]);const U=S.settings.unit;sets.push({w:l&&l.w!==''?String(Math.round(conv(l.w,l.u,U)*10)/10):'',u:U,r:'',p:l&&l.r?String(l.r):'',d:false})}return{id,name:exName(id),m:exInfo(id).m,target,sets}}
+function mkEx(id,n,target){const last=lastSets(id),sets=[],U=S.settings.unit;const top=last&&last.length?topSet(last).s:null;
+ for(let i=0;i<n;i++){const wv=top&&parseFloat(top.w)>0?String(Math.round(conv(top.w,top.u,U)*10)/10):'';sets.push({w:wv,u:U,r:top&&top.r?String(top.r):'',p:'',d:false})}
+ return{id,name:exName(id),m:exInfo(id).m,target,sets}}
 function buildWorkout(d){return{id:uid(),level:S.settings.level,intensity:S.settings.intensity,dayId:d.id,dayName:d.name,sub:d.sub||'',start:Date.now(),end:null,ex:dayPlan(d).map(p=>mkEx(p.id,p.sets,p.target))}}
 const countSets=w=>w.ex.reduce((a,e)=>a+e.sets.length,0);
 const countDone=w=>w.ex.reduce((a,e)=>a+e.sets.filter(s=>s.d).length,0);
@@ -413,14 +417,14 @@ async function wantAwake(){const a=S.settings.awake,need=a==='always'||(a==='wor
 function updAwake(){const el=$('#awake');if(!el)return;el.classList.toggle('on',!!WL);el.textContent=S.settings.awake==='off'?'◐ Screen auto':'☀ Screen on';el.classList.toggle('on',S.settings.awake!=='off')}
 let idleT,dimmed=false;function setDim(on){if(on===dimmed)return;dimmed=on;$('#dim').classList.toggle('on',on);nat('setDim',on)}
 function undim(){setDim(false)}
-function poke(){undim();clearTimeout(idleT);if(UI.view==='workout'&&S.active&&S.settings.awake!=='off')idleT=setTimeout(()=>{if(UI.view==='workout'&&S.active&&S.settings.awake!=='off'&&!$('#alert').classList.contains('on'))setDim(true)},15000)}
+function poke(){undim()}
 ['pointerdown','keydown','scroll'].forEach(ev=>document.addEventListener(ev,poke,{passive:true,capture:true}));
-$('#dim').addEventListener('click',e=>{e.stopPropagation();poke()});
+$('#dim').addEventListener('click',e=>{e.stopPropagation();undim()});
 function showAlert(){let nx=null;if(S.active){for(const e of S.active.ex){const i=e.sets.findIndex(s=>!s.d);if(i>=0){nx={e,i};break}}}
  $('#anext').textContent=nx?nx.e.name:'All sets done';$('#anext2').textContent=nx?`Set ${nx.i+1} of ${nx.e.sets.length}`+(nx.e.sets[nx.i].w?` · ${nx.e.sets[nx.i].w} ${nx.e.sets[nx.i].u}`:''):'Tap Finish to save your workout';
  undim();clearTimeout(idleT);clearTimeout(alertT);const a=$('#alert');a.classList.remove('out');a.classList.add('on');alertT=setTimeout(hideAlert,5000)}
 let alertT;function hideAlert(){clearTimeout(alertT);const a=$('#alert');if(!a.classList.contains('on'))return;a.classList.add('out');setTimeout(()=>{a.classList.remove('on','out');poke()},350)}
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){wantAwake();nativeRestSync();tickRest()}});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){undim();nat('setDim',false);wantAwake();nativeRestSync();tickRest()}else undim()});
 function nextLabel(){if(S.active)for(const e of S.active.ex){const i=e.sets.findIndex(s=>!s.d);if(i>=0)return `Next: ${e.name} · Set ${i+1} of ${e.sets.length}`}return 'All sets done'}
 /* called by the Android app */
 function nativeRestSync(){if(!NATIVE)return;const e=+nat('restEnd')||0;
@@ -453,47 +457,44 @@ function drawDrum(el,spec,pos,isW,bw){el.innerHTML='';const step=19,R=WROW/2/Mat
   const v=fmtW(i*spec.step);n.textContent=isW&&bw&&v===0?'BW':v;n.style.transform=`translateZ(${-R}px) rotateX(${a}deg) translateZ(${R}px)`;
   n.style.opacity=c?1:Math.max(.2,.62-d*.12);n.style.filter=`blur(${Math.min(1.1,d*.3)}px)`;n.style.fontSize=(c?20:18-d*.5)+'px';n.style.fontWeight=c?800:500;n.style.color=c?'var(--text)':'var(--muted)';el.appendChild(n)}}
 let WH=null;
-function wheelOpen(inp,y){const row=inp.closest('.setrow'),card=inp.closest('.card'),w=getW(inp.dataset.w);if(!row||!card||!w||!editable(w))return false;
- const e=w.ex[+inp.dataset.e],st=e.sets[+inp.dataset.s],f=inp.dataset.f,bw=BW.has(e.id);
- const ws=wheelSpec(e,'w'),rs=wheelSpec(e,'r');
- const wv=Math.round(wheelVal(e,st,'w')/ws.step),rv=Math.round(wheelVal(e,st,'r')/rs.step);
- const ins=row.querySelectorAll('.num');const r0=row.getBoundingClientRect(),a=ins[0].getBoundingClientRect(),b=ins[1].getBoundingClientRect();
- const pk=document.createElement('div');pk.className='wpick';pk.style.left=(a.left-r0.left)+'px';pk.style.width=(b.right-a.left)+'px';
- pk.style.gridTemplateColumns=`${a.width}px 1fr ${b.width}px`;
+function wheelOpen(inp){const row=inp.closest('.setrow'),card=inp.closest('.card'),w=getW(inp.dataset.w);if(!row||!card||!w||!editable(w)||WH)return false;
+ const e=w.ex[+inp.dataset.e],st=e.sets[+inp.dataset.s],bw=BW.has(e.id),ws=wheelSpec(e,'w'),rs=wheelSpec(e,'r');
+ const ins=row.querySelectorAll('.num'),r0=row.getBoundingClientRect(),a=ins[0].getBoundingClientRect(),b=ins[1].getBoundingClientRect();
+ const pk=document.createElement('div');pk.className='wpick';pk.style.left=(a.left-r0.left)+'px';pk.style.width=(b.right-a.left)+'px';pk.style.gridTemplateColumns=`${a.width}px 1fr ${b.width}px`;
  pk.innerHTML=`<div class="pband"></div><div class="wh"></div><div class="pu">${S.settings.unit}</div><div class="wh"></div>`;row.appendChild(pk);
- const drums=pk.querySelectorAll('.wh');
- WH={inp,row,card,pk,e,st,f,bw,spec:f==='w'?ws:rs,other:f==='w'?{el:drums[1],spec:rs,pos:rv}:{el:drums[0],spec:ws,pos:wv},el:drums[f==='w'?0:1],pos:f==='w'?wv:rv,start:f==='w'?wv:rv,y0:y,last:[],idx:null,raf:0};
- drawDrum(WH.other.el,WH.other.spec,WH.other.pos,f!=='w',bw);drawDrum(WH.el,WH.spec,WH.pos,f==='w',bw);
- // focus: zoom the card, blur everything except the exercise name and this set
+ const dr=pk.querySelectorAll('.wh');
+ WH={row,card,pk,e,st,bw,wheels:{w:{el:dr[0],spec:ws,pos:Math.round(wheelVal(e,st,'w')/ws.step)},r:{el:dr[1],spec:rs,pos:Math.round(wheelVal(e,st,'r')/rs.step)}},act:inp.dataset.f,idx:null,raf:0,busy:false};
+ drawDrum(dr[0],ws,WH.wheels.w.pos,true,bw);drawDrum(dr[1],rs,WH.wheels.r.pos,false,bw);
  card.style.transformOrigin=`50% ${r0.top-card.getBoundingClientRect().top+r0.height/2}px`;
- const dim=[...document.querySelectorAll('.wtop,#app .card,#app .col>.exfoot,#app .col>.small,#app>.row,.cols>.col>div:not(.card)')].filter(x=>x!==card&&!x.contains(card));
- [...card.children].forEach(ch=>{if(ch===row)return;if(ch.classList.contains('exhead')){[...ch.querySelectorAll('.exsub,.icon')].forEach(z=>dim.push(z))}else dim.push(ch)});
- WH.dim=dim;dim.forEach(x=>{x.classList.add('fx');x.classList.add('fxdim')});
- inp.readOnly=true;inp.blur();row.classList.add('frow');card.classList.add('focus');requestAnimationFrame(()=>pk.classList.add('on'));
+ const dim=[...document.querySelectorAll('.wtop,#app .card,#app .col>.exfoot,#app .col>.small,#app>.row')].filter(x=>x!==card&&!x.contains(card));
+ [...card.children].forEach(ch=>{if(ch===row)return;if(ch.classList.contains('exhead'))[...ch.querySelectorAll('.exsub,.icon')].forEach(z=>dim.push(z));else dim.push(ch)});
+ WH.dim=dim;dim.forEach(x=>{x.classList.add('fx','fxdim')});row.classList.add('frow');card.classList.add('focus');requestAnimationFrame(()=>pk.classList.add('on'));
+ // a full-screen layer catches drags (left = weight, right = reps) and the confirming tap
+ const cap=document.createElement('div');cap.id='wcap';document.body.appendChild(cap);WH.cap=cap;
+ const midX=()=>{const r=WH.pk.getBoundingClientRect();return r.left+r.width/2};
+ let g=null;
+ cap.addEventListener('pointerdown',ev=>{if(!WH)return;cancelAnimationFrame(WH.raf);snapAll();const k=ev.clientX<midX()?'w':'r';WH.act=k;g={id:ev.pointerId,x:ev.clientX,y:ev.clientY,t:performance.now(),start:WH.wheels[k].pos,moved:false,last:[[performance.now(),ev.clientY]]};cap.setPointerCapture(ev.pointerId)});
+ cap.addEventListener('pointermove',ev=>{if(!g||!WH)return;if(!g.moved&&Math.hypot(ev.clientX-g.x,ev.clientY-g.y)<8)return;g.moved=true;const W=WH.wheels[WH.act],max=Math.round(W.spec.max/W.spec.step);
+  W.pos=Math.max(0,Math.min(max,g.start+(g.y-ev.clientY)/WROW));g.last.push([performance.now(),ev.clientY]);if(g.last.length>5)g.last.shift();wheelDraw()});
+ const up=ev=>{if(!g||!WH)return;const G=g;g=null;if(!G.moved){wheelConfirm();return}
+  let v=0;const L=G.last;if(L.length>1){const [t0,y0]=L[0],[t1,y1]=L[L.length-1];if(t1-t0>0&&performance.now()-t1<80)v=(y0-y1)/WROW/(t1-t0)}wheelCoast(v)};
+ cap.addEventListener('pointerup',up);cap.addEventListener('pointercancel',up);
  if(navigator.vibrate)navigator.vibrate(8);return true}
-function wheelMove(y){if(!WH)return;const t=performance.now();WH.last.push([t,y]);if(WH.last.length>5)WH.last.shift();
- const max=Math.round(WH.spec.max/WH.spec.step);WH.pos=Math.max(0,Math.min(max,WH.start+(WH.y0-y)/WROW));wheelDraw()}
-function wheelDraw(){drawDrum(WH.el,WH.spec,WH.pos,WH.f==='w',WH.bw);const i=Math.round(WH.pos);if(i!==WH.idx){if(WH.idx!==null&&navigator.vibrate)navigator.vibrate(4);WH.idx=i}}
-function wheelRelease(){if(!WH)return;const L=WH.last;let v=0;if(L.length>1){const [t0,y0]=L[0],[t1,y1]=L[L.length-1];if(t1-t0>0&&performance.now()-t1<80)v=(y0-y1)/WROW/(t1-t0)}
- const max=Math.round(WH.spec.max/WH.spec.step);let prev=performance.now();
- const step=now=>{const dt=now-prev;prev=now;if(Math.abs(v)>.002){WH.pos=Math.max(0,Math.min(max,WH.pos+v*dt));v*=Math.pow(.994,dt);wheelDraw();WH.raf=requestAnimationFrame(step);return}
-  const target=Math.round(WH.pos);if(Math.abs(target-WH.pos)>.01){WH.pos+=(target-WH.pos)*Math.min(1,dt/80);wheelDraw();WH.raf=requestAnimationFrame(step);return}
-  WH.pos=target;wheelDraw();wheelCommit()};WH.raf=requestAnimationFrame(step)}
-function wheelCommit(){const W=WH;if(!W)return;const val=fmtW(Math.round(W.pos)*W.spec.step);W.st[W.f]=String(val);if(W.f==='w')W.st.u=S.settings.unit;save();
- setTimeout(()=>{W.pk.classList.remove('on');W.card.classList.remove('focus');W.row.classList.remove('frow');W.dim.forEach(x=>x.classList.remove('fxdim'));W.inp.readOnly=false;
-  setTimeout(()=>{if(WH===W)WH=null;render()},300)},350)}
-// touch: hold briefly then drag; a quick tap still opens the keyboard
-let TH=null;
-document.addEventListener('touchstart',ev=>{const t=ev.target.closest&&ev.target.closest('input.num');if(!t||t.disabled||WH)return;const p=ev.touches[0];
- TH={t,x:p.clientX,y:p.clientY,armed:false,timer:setTimeout(()=>{if(TH&&TH.t===t&&wheelOpen(t,TH.y))TH.armed=true},180)}},{passive:true});
-document.addEventListener('touchmove',ev=>{if(!TH)return;const p=ev.touches[0];if(!TH.armed){if(Math.hypot(p.clientX-TH.x,p.clientY-TH.y)>8){clearTimeout(TH.timer);TH=null}return}ev.preventDefault();wheelMove(p.clientY)},{passive:false});
-document.addEventListener('touchend',ev=>{if(!TH)return;clearTimeout(TH.timer);if(TH.armed){ev.preventDefault();wheelRelease()}TH=null},{passive:false});
-document.addEventListener('touchcancel',()=>{if(TH){clearTimeout(TH.timer);if(TH.armed)wheelRelease();TH=null}});
-// mouse (desktop): drag up/down on a number
-let MH=null;
-document.addEventListener('mousedown',ev=>{const t=ev.target.closest&&ev.target.closest('input.num');if(!t||t.disabled||WH)return;MH={t,y:ev.clientY,on:false}});
-document.addEventListener('mousemove',ev=>{if(!MH)return;if(!MH.on){if(Math.abs(ev.clientY-MH.y)>6&&wheelOpen(MH.t,MH.y))MH.on=true;else return}ev.preventDefault();wheelMove(ev.clientY)});
-document.addEventListener('mouseup',()=>{if(MH&&MH.on)wheelRelease();MH=null});
+function wheelDraw(){const W=WH.wheels[WH.act];drawDrum(W.el,W.spec,W.pos,WH.act==='w',WH.bw);const i=Math.round(W.pos)+(WH.act==='w'?0:100000);if(i!==WH.idx){if(WH.idx!==null&&navigator.vibrate)navigator.vibrate(4);WH.idx=i}}
+function snapAll(){if(!WH)return;['w','r'].forEach(k=>{const W=WH.wheels[k];W.pos=Math.round(W.pos);drawDrum(W.el,W.spec,W.pos,k==='w',WH.bw)})}
+function wheelCoast(v){const W=WH.wheels[WH.act],max=Math.round(W.spec.max/W.spec.step);let prev=performance.now();
+ const step=now=>{if(!WH)return;const dt=now-prev;prev=now;if(Math.abs(v)>.002){W.pos=Math.max(0,Math.min(max,W.pos+v*dt));v*=Math.pow(.994,dt);wheelDraw();WH.raf=requestAnimationFrame(step);return}
+  const tg=Math.round(W.pos);if(Math.abs(tg-W.pos)>.01){W.pos+=(tg-W.pos)*Math.min(1,dt/80);wheelDraw();WH.raf=requestAnimationFrame(step);return}W.pos=tg;wheelDraw()};
+ WH.raf=requestAnimationFrame(step)}
+function wheelConfirm(){const W=WH;if(!W)return;cancelAnimationFrame(W.raf);snapAll();
+ W.st.w=String(fmtW(W.wheels.w.pos*W.wheels.w.spec.step));W.st.u=S.settings.unit;W.st.r=String(fmtW(W.wheels.r.pos*W.wheels.r.spec.step));
+ if(W.bw&&W.st.w==='0')W.st.w='';
+ {const i=W.e.sets.indexOf(W.st);W.e.sets.slice(i+1).forEach(x=>{if(!x.d){x.w=W.st.w;x.u=W.st.u;x.r=W.st.r}})}
+ save();if(navigator.vibrate)navigator.vibrate(10);
+ W.cap.remove();W.pk.classList.remove('on');W.card.classList.remove('focus');W.row.classList.remove('frow');W.dim.forEach(x=>x.classList.remove('fxdim'));
+ setTimeout(()=>{if(WH===W)WH=null;render()},300)}
+// one tap on a weight or reps box opens the wheels (no keyboard)
+document.addEventListener('click',ev=>{const t=ev.target.closest&&ev.target.closest('input.num');if(!t||t.disabled)return;ev.preventDefault();t.blur();wheelOpen(t)},true);
 
 /* ---------- modal ---------- */
 let modalResolve=null,PICK_CB=null;
@@ -570,16 +571,16 @@ function exCardList(w,key,ed){return w.ex.map((e,ei)=>{const n=e.sets.length,dn=
  <div class="setrow head"><span>✓</span><span>Set</span><span>Weight</span><span></span><span>${e.id==='plank'?'Sec':'Reps'}</span><span></span></div>
  ${e.sets.map((s,si)=>{const a=`${at} data-s="${si}"`;return `<div class="setrow ${s.d?'done':''}">
   <button class="chk ${s.d?'on':''} ${ed&&!canToggle(e,si)?'off':''}" data-act="check" ${a} ${ed&&canToggle(e,si)?'':'disabled'} aria-label="Mark set done">✓</button><span class="sn">${si+1}</span>
-  <input class="num" inputmode="decimal" data-f="w" ${a} value="${esc(s.w)}" placeholder="${BW.has(e.id)?'BW':'0'}" ${ed?'':'disabled'}>
+  <input class="num" readonly inputmode="decimal" data-f="w" ${a} value="${esc(s.w)}" placeholder="${BW.has(e.id)?'BW':'0'}" ${ed?'':'disabled'}>
   <span class="unit">${s.u}</span>
-  <input class="num" inputmode="numeric" data-f="r" ${a} value="${esc(s.r)}" placeholder="${esc(s.p||e.target)}" ${ed?'':'disabled'}>
+  <input class="num" readonly inputmode="numeric" data-f="r" ${a} value="${esc(s.r)}" placeholder="${esc(s.p||e.target)}" ${ed?'':'disabled'}>
   ${ed?`<button class="x" data-act="delset" ${a} aria-label="Remove set">×</button>`:'<span></span>'}</div>`}).join('')}
  ${ed?`<div class="exfoot"><button class="ghost" data-act="addset" ${at}>+ Add set</button></div>`:''}${key==='A'?exNote(e.id):''}</div>`})}
 function splitCards(cards,tail){if(!isWide())return cols(cards.join('')+tail);const L=cards.filter((_,i)=>i%2===0),R=cards.filter((_,i)=>i%2===1);return cols(L.join('')+(L.length<=R.length?tail:''),R.join('')+(L.length>R.length?tail:''))}
 
 function renderWorkout(){const w=S.active;if(!w){UI.view='home';return renderHome()}
  return `<div class="wtop"><button class="icon" data-act="nav" data-v="home" aria-label="Back">‹</button><div class="sp"><div class="t">${esc(w.dayName)}</div><div class="small muted">${countDone(w)}/${countSets(w)} sets</div></div>
-  <button class="pill" id="awake" data-act="awake"></button><button class="btn" data-act="finish">Finish</button></div>
+  <button class="pill" id="awake" data-act="awake"></button><button class="icon" data-act="dimnow" aria-label="Dim screen" title="Dim screen">◐</button><button class="btn" data-act="finish">Finish</button></div>
   ${splitCards(exCardList(w,'A',true),`<div class="exfoot"><button class="ghost" data-act="addex">+ Add exercise</button></div>
   <div class="small muted" style="text-align:center;margin-top:14px">Rest timer: ${mmss(S.settings.rest)} · starts when you tick a set</div>`)}`}
 
@@ -723,13 +724,14 @@ const ACT={
  mcont:()=>{S.due=day0();save();render()},
  mskip:()=>{const mi=missedInfo();if(mi){const l=S.settings.level;S.rot[l]=(S.rot[l]||0)+mi.n}S.due=nextTrain(day0());save();render()},
  finish:()=>finishWorkout(),
- awake:()=>{S.settings.awake=S.settings.awake==='off'?'workout':'off';save();wantAwake();poke();toast(S.settings.awake==='off'?'Screen follows phone settings':'Screen stays on, dims after 15 s')},
+ awake:()=>{S.settings.awake=S.settings.awake==='off'?'workout':'off';save();wantAwake();poke();toast(S.settings.awake==='off'?'Screen follows phone settings':'Screen stays on')},
+ dimnow:()=>{setTimeout(()=>setDim(true),60)},
  alertok:()=>hideAlert(),
  check:b=>{const w=getW(b.dataset.w),e=w.ex[b.dataset.e],si=+b.dataset.s,s=e.sets[si];if(!canToggle(e,si))return;
   if(!s.d){const noW=!BW.has(e.id)&&!(parseFloat(s.w)>0),noR=!(parseFloat(s.r)>0);
    if(noW||noR)return toast(noW&&noR?'Enter weight and reps first':noW?'Enter the weight first':(e.id==='plank'?'Enter the seconds first':'Enter the reps first'))}
   s.d=!s.d;save();render();if(b.dataset.w==='A'){if(s.d)startRest(S.settings.rest);else skipRest()}},
- addset:b=>{const w=getW(b.dataset.w),e=w.ex[b.dataset.e],l=e.sets[e.sets.length-1];e.sets.push({w:l?l.w:'',u:S.settings.unit,r:'',p:l?(l.r||l.p):'',d:false});save();render()},
+ addset:b=>{const w=getW(b.dataset.w),e=w.ex[b.dataset.e],l=e.sets[e.sets.length-1];e.sets.push({w:l?l.w:'',u:S.settings.unit,r:l?l.r:'',p:'',d:false});save();render()},
  delset:b=>{const w=getW(b.dataset.w),e=w.ex[b.dataset.e];e.sets.splice(b.dataset.s,1);save();render()},
  exmenu:b=>{const k=b.dataset.w,ei=b.dataset.e,e=getW(k).ex[ei];openModal(`<div class="mhead"><b>${esc(e.name)}</b><button class="icon" data-act="mclose">✕</button></div>
   <div class="small muted" style="margin-bottom:6px">Rename (applies everywhere from now on)</div><input class="field" id="rn" value="${esc(e.name)}">
