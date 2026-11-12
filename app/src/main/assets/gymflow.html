@@ -217,6 +217,9 @@ body.light .wpick .pband{background:rgba(20,23,28,.08)}
 .wpick .pu{position:relative;z-index:1;text-align:center;font-size:13px;font-weight:700}
 #wcap{position:fixed;inset:0;z-index:30;touch-action:none;cursor:ns-resize}
 .num[readonly]{cursor:pointer}
+.setrow.locked .num,.setrow.locked .unit,.setrow.locked .sn{opacity:.32}
+.chk.off{opacity:.3}
+.num:disabled{cursor:default}
 </style>
 </head>
 <body>
@@ -418,8 +421,9 @@ function updAwake(){const el=$('#awake');if(!el)return;el.classList.toggle('on',
 let idleT,dimmed=false;function setDim(on){if(on===dimmed)return;dimmed=on;$('#dim').classList.toggle('on',on);nat('setDim',on)}
 function undim(){setDim(false)}
 function poke(){undim()}
-['pointerdown','keydown','scroll'].forEach(ev=>document.addEventListener(ev,poke,{passive:true,capture:true}));
-$('#dim').addEventListener('click',e=>{e.stopPropagation();undim()});
+
+['pointerdown','pointerup','touchstart','touchend','mousedown'].forEach(t=>$('#dim').addEventListener(t,e=>{e.stopPropagation()},{capture:true}));
+$('#dim').addEventListener('click',e=>{e.stopPropagation();e.preventDefault();undim()});
 function showAlert(){let nx=null;if(S.active){for(const e of S.active.ex){const i=e.sets.findIndex(s=>!s.d);if(i>=0){nx={e,i};break}}}
  $('#anext').textContent=nx?nx.e.name:'All sets done';$('#anext2').textContent=nx?`Set ${nx.i+1} of ${nx.e.sets.length}`+(nx.e.sets[nx.i].w?` · ${nx.e.sets[nx.i].w} ${nx.e.sets[nx.i].u}`:''):'Tap Finish to save your workout';
  undim();clearTimeout(idleT);clearTimeout(alertT);const a=$('#alert');a.classList.remove('out');a.classList.add('on');alertT=setTimeout(hideAlert,5000)}
@@ -432,7 +436,7 @@ function nativeRestSync(){if(!NATIVE)return;const e=+nat('restEnd')||0;
  else if(T.on&&!T.fired&&Date.now()<T.end-1500)hideRest()}
 function nativeRestDone(){if(!T.on||T.fired)return;T.fired=true;hideRest();showAlert()}
 function nativeAlert(){if(T.on){T.fired=true;hideRest()}if(S.active)showAlert()}
-function handleBack(){if($('#modal').classList.contains('on')){closeModal(false);return true}if($('#alert').classList.contains('on')){hideAlert();return true}
+function handleBack(){if(dimmed){undim();return true}if($('#modal').classList.contains('on')){closeModal(false);return true}if($('#alert').classList.contains('on')){hideAlert();return true}
  const back={workout:'home',hist:'history',dayedit:'settings',history:'home',stats:'home',settings:'home'}[UI.view];if(back){setView(back);return true}return false}
 
 /* ---------- rest timer ---------- */
@@ -569,18 +573,18 @@ function exCardList(w,key,ed){return w.ex.map((e,ei)=>{const n=e.sets.length,dn=
  return `<div class="card ex ${n&&dn===n?'complete':''}"><div class="exhead"><div class="sp"><div class="exname">${esc(e.name)}</div><div class="exsub">${esc(e.m)} · ${n} × ${esc(e.target)} ${e.id==='plank'?'sec':'reps'} · ${dn}/${n} done</div></div>
  ${ed?`<button class="icon" data-act="exmenu" ${at}>⋯</button>`:''}</div>
  <div class="setrow head"><span>✓</span><span>Set</span><span>Weight</span><span></span><span>${e.id==='plank'?'Sec':'Reps'}</span><span></span></div>
- ${e.sets.map((s,si)=>{const a=`${at} data-s="${si}"`;return `<div class="setrow ${s.d?'done':''}">
+ ${e.sets.map((s,si)=>{const a=`${at} data-s="${si}"`,cur=e.sets.findIndex(x=>!x.d),ev=ed&&(key!=='A'||si===cur),lk=key==='A'&&ed&&!s.d&&si>cur;return `<div class="setrow ${s.d?'done':''} ${lk?'locked':''}">
   <button class="chk ${s.d?'on':''} ${ed&&!canToggle(e,si)?'off':''}" data-act="check" ${a} ${ed&&canToggle(e,si)?'':'disabled'} aria-label="Mark set done">✓</button><span class="sn">${si+1}</span>
-  <input class="num" readonly inputmode="decimal" data-f="w" ${a} value="${esc(s.w)}" placeholder="${BW.has(e.id)?'BW':'0'}" ${ed?'':'disabled'}>
+  <input class="num" readonly inputmode="decimal" data-f="w" ${a} value="${esc(s.w)}" placeholder="${BW.has(e.id)?'BW':'0'}" ${ev?'':'disabled'}>
   <span class="unit">${s.u}</span>
-  <input class="num" readonly inputmode="numeric" data-f="r" ${a} value="${esc(s.r)}" placeholder="${esc(s.p||e.target)}" ${ed?'':'disabled'}>
+  <input class="num" readonly inputmode="numeric" data-f="r" ${a} value="${esc(s.r)}" placeholder="${esc(s.p||e.target)}" ${ev?'':'disabled'}>
   ${ed?`<button class="x" data-act="delset" ${a} aria-label="Remove set">×</button>`:'<span></span>'}</div>`}).join('')}
  ${ed?`<div class="exfoot"><button class="ghost" data-act="addset" ${at}>+ Add set</button></div>`:''}${key==='A'?exNote(e.id):''}</div>`})}
 function splitCards(cards,tail){if(!isWide())return cols(cards.join('')+tail);const L=cards.filter((_,i)=>i%2===0),R=cards.filter((_,i)=>i%2===1);return cols(L.join('')+(L.length<=R.length?tail:''),R.join('')+(L.length>R.length?tail:''))}
 
 function renderWorkout(){const w=S.active;if(!w){UI.view='home';return renderHome()}
  return `<div class="wtop"><button class="icon" data-act="nav" data-v="home" aria-label="Back">‹</button><div class="sp"><div class="t">${esc(w.dayName)}</div><div class="small muted">${countDone(w)}/${countSets(w)} sets</div></div>
-  <button class="pill" id="awake" data-act="awake"></button><button class="icon" data-act="dimnow" aria-label="Dim screen" title="Dim screen">◐</button><button class="btn" data-act="finish">Finish</button></div>
+  <button class="icon" data-act="dimnow" aria-label="Dim screen" title="Dim screen">◐</button><button class="btn" data-act="finish">Finish</button></div>
   ${splitCards(exCardList(w,'A',true),`<div class="exfoot"><button class="ghost" data-act="addex">+ Add exercise</button></div>
   <div class="small muted" style="text-align:center;margin-top:14px">Rest timer: ${mmss(S.settings.rest)} · starts when you tick a set</div>`)}`}
 
