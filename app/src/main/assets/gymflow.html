@@ -438,12 +438,15 @@ function poke(){undim()}
 ['pointerdown','pointerup','touchstart','touchend','mousedown'].forEach(t=>$('#dim').addEventListener(t,e=>{e.stopPropagation()},{capture:true}));
 $('#dim').addEventListener('click',e=>{e.stopPropagation();e.preventDefault();undim()});
 ['touchmove','wheel'].forEach(t=>$('#dim').addEventListener(t,e=>{e.preventDefault();e.stopPropagation()},{passive:false}));
-function showAlert(){let nx=null;if(S.active){for(const e of S.active.ex){const i=e.sets.findIndex(s=>!s.d);if(i>=0){nx={e,i};break}}}
+/* next set to do: stay on the exercise you just ticked, then the ones after it, then any earlier ones left */
+function nextSet(){const w=S.active;if(!w||!w.ex.length)return null;const n=w.ex.length,c=Math.min(Math.max(+w.cur||0,0),n-1);
+ for(let k=0;k<n;k++){const e=w.ex[(c+k)%n],i=e.sets.findIndex(s=>!s.d);if(i>=0)return{e,i}}return null}
+function showAlert(){const nx=nextSet();
  $('#anext').textContent=nx?nx.e.name:'All sets done';$('#anext2').textContent=nx?`Set ${nx.i+1} of ${nx.e.sets.length}`+(nx.e.sets[nx.i].w?` · ${nx.e.sets[nx.i].w} ${nx.e.sets[nx.i].u}`:''):'Tap Finish to save your workout';
  undim();clearTimeout(idleT);clearTimeout(alertT);const a=$('#alert');a.classList.remove('out');a.classList.add('on');alertT=setTimeout(hideAlert,5000)}
 let alertT;function hideAlert(){clearTimeout(alertT);const a=$('#alert');if(!a.classList.contains('on'))return;a.classList.add('out');setTimeout(()=>{a.classList.remove('on','out');poke()},350)}
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){undim();nat('setDim',false);wantAwake();nativeRestSync();tickRest()}else undim()});
-function nextLabel(){if(S.active)for(const e of S.active.ex){const i=e.sets.findIndex(s=>!s.d);if(i>=0)return `Next: ${e.name} · Set ${i+1} of ${e.sets.length}`}return 'All sets done'}
+function nextLabel(){const nx=nextSet();return nx?`Next: ${nx.e.name} · Set ${nx.i+1} of ${nx.e.sets.length}`:'All sets done'}
 /* called by the Android app */
 function nativeRestSync(){if(!NATIVE)return;const e=+nat('restEnd')||0;
  if(e>Date.now()){T.end=e;if(!T.on){T.on=true;T.fired=false;T.total=Math.max(1,(e-Date.now())/1000)}$('#rest').classList.add('on');if(!T.iv)T.iv=setInterval(tickRest,200);tickRest()}
@@ -846,7 +849,7 @@ const ACT={
  check:b=>{const w=getW(b.dataset.w),e=w.ex[b.dataset.e],si=+b.dataset.s,s=e.sets[si];if(!canToggle(e,si))return;
   if(!s.d){const noW=!BW.has(e.id)&&!(parseFloat(s.w)>0),noR=!(parseFloat(s.r)>0);
    if(noW||noR)return toast(noW&&noR?'Enter weight and reps first':noW?'Enter the weight first':(e.id==='plank'?'Enter the seconds first':'Enter the reps first'))}
-  s.d=!s.d;save();render();if(b.dataset.w==='A'){if(s.d)startRest(S.settings.rest);else skipRest()}},
+  s.d=!s.d;if(b.dataset.w==='A'&&s.d)w.cur=+b.dataset.e;save();render();if(b.dataset.w==='A'){if(s.d)startRest(S.settings.rest);else skipRest()}},
  addset:b=>{const w=getW(b.dataset.w),e=w.ex[b.dataset.e],l=e.sets[e.sets.length-1];e.sets.push({w:l?l.w:'',u:S.settings.unit,r:l?l.r:'',p:'',d:false});save();render()},
  delset:b=>{const w=getW(b.dataset.w),e=w.ex[b.dataset.e];e.sets.splice(b.dataset.s,1);save();render()},
  exmenu:b=>{const k=b.dataset.w,ei=b.dataset.e,e=getW(k).ex[ei];openModal(`<div class="mhead"><b>${esc(e.name)}</b><button class="icon" data-act="mclose">✕</button></div>
