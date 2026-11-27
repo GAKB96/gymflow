@@ -478,6 +478,11 @@ function drawDrum(el,spec,pos,isW,bw){el.innerHTML='';const step=19,R=WROW/2/Mat
   const v=fmtW(i*spec.step);n.textContent=isW&&bw&&v===0?'BW':v;n.style.transform=`translateZ(${-R}px) rotateX(${a}deg) translateZ(${R}px)`;
   n.style.opacity=c?1:Math.max(.2,.62-d*.12);n.style.filter=`blur(${Math.min(1.1,d*.3)}px)`;n.style.fontSize=(c?20:18-d*.5)+'px';n.style.fontWeight=c?800:500;n.style.color=c?'var(--text)':'var(--muted)';el.appendChild(n)}}
 let WH=null;
+/* after a wheel closes, keep a clear layer over the screen briefly so the confirming tap
+   (and anything it would trigger underneath) is swallowed */
+let TAPLOCK=0;
+function swallowTaps(cap){cap.style.cursor='default';TAPLOCK=Date.now()+450;setTimeout(()=>cap.remove(),450)}
+['click','pointerdown','pointerup','mousedown','mouseup','touchstart','touchend'].forEach(t=>document.addEventListener(t,e=>{if(Date.now()<TAPLOCK){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation()}},{capture:true,passive:false}));
 function wheelOpen(inp){const row=inp.closest('.setrow'),card=inp.closest('.card'),w=getW(inp.dataset.w);if(!row||!card||!w||!editable(w)||WH)return false;
  const e=w.ex[+inp.dataset.e],st=e.sets[+inp.dataset.s],bw=BW.has(e.id),ws=wheelSpec(e,'w'),rs=wheelSpec(e,'r');
  const ins=row.querySelectorAll('.num'),r0=row.getBoundingClientRect(),a=ins[0].getBoundingClientRect(),b=ins[1].getBoundingClientRect();
@@ -512,7 +517,7 @@ function wheelConfirm(){const W=WH;if(!W)return;cancelAnimationFrame(W.raf);snap
  if(W.bw&&W.st.w==='0')W.st.w='';
  {const i=W.e.sets.indexOf(W.st);W.e.sets.slice(i+1).forEach(x=>{if(!x.d){x.w=W.st.w;x.u=W.st.u;x.r=W.st.r}})}
  save();if(navigator.vibrate)navigator.vibrate(10);
- W.cap.remove();W.pk.classList.remove('on');W.card.classList.remove('focus');W.row.classList.remove('frow');W.dim.forEach(x=>x.classList.remove('fxdim'));
+ swallowTaps(W.cap);W.pk.classList.remove('on');W.card.classList.remove('focus');W.row.classList.remove('frow');W.dim.forEach(x=>x.classList.remove('fxdim'));
  setTimeout(()=>{if(WH===W)WH=null;render()},300)}
 // one tap on a weight or reps box opens the wheels (no keyboard)
 document.addEventListener('click',ev=>{const t=ev.target.closest&&ev.target.closest('input.num');if(!t||t.disabled)return;ev.preventDefault();t.blur();wheelOpen(t)},true);
@@ -585,7 +590,7 @@ function openPicker(el,colsDef,done,opt={}){if(PK||WH)return;const row=el.closes
    const tg=Math.round(c.pos);if(Math.abs(tg-c.pos)>.01){c.pos+=(tg-c.pos)*Math.min(1,dt/80);draw();PK.raf=requestAnimationFrame(st);return}c.pos=tg;draw()};PK.raf=requestAnimationFrame(st)};
  cap.addEventListener('pointerup',up);cap.addEventListener('pointercancel',up);if(navigator.vibrate)navigator.vibrate(8)}
 function pickerClose(ok){const P=PK;if(!P)return;cancelAnimationFrame(P.raf);P.snap();if(ok){P.done(P.cols.map(c=>Math.round((c.min+c.pos*c.step)*10)/10));save();if(navigator.vibrate)navigator.vibrate(10)}
- P.cap.remove();P.pk.classList.remove('on');P.card.classList.remove('focus');P.dim.forEach(x=>x.classList.remove('fxdim'));setTimeout(()=>{if(PK===P)PK=null;render()},300)}
+ swallowTaps(P.cap);P.pk.classList.remove('on');P.card.classList.remove('focus');P.dim.forEach(x=>x.classList.remove('fxdim'));setTimeout(()=>{if(PK===P)PK=null;render()},300)}
 function openPick(kind,el){const P=S.profile,u=S.settings.unit,cw=curW();
  const wcol=kg=>u==='kg'?{min:30,max:250,step:.1,val:kg,fmt:v=>f1(v)+' kg'}:{min:66,max:550,step:.2,val:Math.round(conv(kg,'kg','lbs')*5)/5,fmt:v=>f1(v)+' lbs'};
  const toKg=v=>u==='kg'?v:conv(v,'lbs','kg');
